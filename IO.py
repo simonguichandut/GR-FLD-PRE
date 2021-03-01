@@ -4,6 +4,8 @@ import os
 import numpy as np
 import sys
 
+#------------------------------------ Core ------------------------------------
+
 def load_params(as_dict=True):
     ''' Load parameters given in params.txt '''
 
@@ -20,42 +22,7 @@ def load_params(as_dict=True):
         return M,R,yb,comp,Prad
 
 
-def change_param(key, new_value):
-
-    old_value = load_params()[key]
-
-    if type(old_value) == str:
-        old_value_string = old_value
-
-    else:
-
-        if old_value>100: # we are looking at y_inner which is formatted as '1e8'
-            old_value_string = '1e' + str(int(np.log10(old_value)))
-            print(old_value_string)
-
-        elif old_value%1==0: # has no decimals
-            old_value_string = str(int(old_value))
-
-        else:
-            old_value_string = str(old_value).rstrip('0') # remove trailing zeros if there are any
-
-    new_file_contents = ""
-    with open('./params.txt','r') as f:
-        for line in f:
-            if key in line:
-                new_file_contents += line.replace(old_value_string,str(new_value))
-            else:
-                new_file_contents += line
-
-    print(new_file_contents)
-
-    with open('./params.txt','w') as f:
-        f.write(new_file_contents)
-
-
-
-
-def get_name():  
+def get_name(include_Prad = True):  
     ''' We give various files and directories the same name corresponding 
         to the setup given in the parameter file '''
     params = load_params()
@@ -63,27 +30,39 @@ def get_name():
         params['comp'], ('M%.1f'%params['M']), ('R%2d'%params['R']) , 
         ('y%1d'%np.log10(params['yb'])) ])
 
-    if params['Prad'] == 'exact':
+    if params['Prad'] == 'exact' and include_Prad:
         name += '_exact'
         
     return name
 
 
-def make_directories():
-    ''' Make directories according to model name '''
-    for D in ('winds/','envelopes/'):
-        path = D + 'models/' + get_name()
-        if not os.path.exists(path): 
-            os.mkdir(path)
-
-
 def get_wind_list():
-    ''' Available winds for current model, listed by their logMdot values '''
-    return load_wind_roots()[0]
+    ''' Available winds for current model, listed by their logMdot (g/s) values '''
+    
+    path = 'winds/models/' + get_name() + '/'
+
+    logMdots = []
+    for filename in os.listdir(path):
+        if filename.endswith('.txt'):
+            logMdots.append(eval(filename[:-4]))
+
+    sorted_list = list(np.sort(logMdots))
+    return sorted_list
+
 
 def get_envelope_list():
-    ''' Available envelopes for current model, listed by their r_ph values '''
-    pass
+    ''' Available envelopes for current model, listed by their r_ph (km) values '''
+
+    path = 'envelopes/models/' + get_name(include_Prad=False) + '/'
+
+    Rphotkms = []
+    for filename in os.listdir(path):
+        if filename.endswith('.txt'):
+            Rphotkms.append(eval(filename[:-4].replace('_','.')))
+
+    sorted_list = list(np.sort(Rphotkms))
+    sorted_list_clean = [int(x) if str(x)[-1]=='0' else x for x in sorted_list] # changes 15.0 to 15 for filename cleanliness
+    return sorted_list_clean
 
 
 
@@ -183,12 +162,9 @@ def write_wind(logMdot,wind):
     with open(filename,'w') as f:
 
         # Write header
-        f.write(('{:<11s} \t'*10).format(
+        f.write(('{:<11s} \t'*11).format(
             'r (cm)','T (K)','rho (g/cm3)','P (dyne/cm2)','u (cm/s)',
-            'cs (cm/s)','phi','L (erg/s)','L* (erg/s)','taus'))
-
-        if load_params()['FLD'] == True:
-            f.write('{:<11s}'.format('lambda'))
+            'cs (cm/s)','phi','L (erg/s)','L* (erg/s)','taus','lambda'))
 
         f.write('\n')
 
@@ -206,7 +182,7 @@ def write_wind(logMdot,wind):
     print('Wind data saved at: ',filename)
 
 
-def read_wind(logMdot, specific_file=None):
+def load_wind(logMdot, specific_file=None):
 
     '''outputs arrays from save file and rs '''
 
@@ -215,12 +191,6 @@ def read_wind(logMdot, specific_file=None):
     else:
         path = 'winds/models/' + get_name() + '/'
         filename = path + ('%.2f'%logMdot) + '.txt'
-
-    def append_vars(line,varz): 
-        l=line.split()
-        for col,var in enumerate(varz):
-            var.append(float(l[col]))
-        
 
     r,T,rho,P,u,cs,phi,L,Lstar,taus,lam = [[] for i in range(11)]
     varz = [r,T,rho,P,u,cs,phi,L,Lstar,taus,lam]
@@ -274,7 +244,6 @@ def save_EdotTsrel(logMdot, Edotvals, TsvalsA, TsvalsB, decimals=8):
         elif decimals == 10:
             f.write('{:<13.10f} \t {:<13.10f} \t {:<13.10f}\n'.format(
                     edot, tsa, tsb))
-
 
 
 def load_EdotTsrel(logMdot, specific_file=None):
@@ -345,44 +314,189 @@ def clean_EdotTsrelfile(logMdot,warning=1):
             
 
 
-# def info(logMdot, returnit=False):
-#     """ Print (or returns) True/False for if root exists, if EdotTsrel file exists
-#     (if FLD==True) and if datafile exists"""
-
-#     # Root
-#     logMdots,_ = load_roots()
-#     root_exists = (logMdot in logMdots)
-
-#     # EdotTs rel file
-#     if load_params()["FLD"] == True:
-#         try:
-#             load_EdotTsrel(logMdot)
-#         except:
-#             EdotTsrel_exists = False
-#         else:
-#             EdotTsrel_exists = True
-#     else:
-#         EdotTsrel_exists = "(not FLD)"
-
-#     # Datafile
-#     try:
-#         read_from_file(logMdot)
-#     except:
-#         datafile_exists = False
-#     else:
-#         datafile_exists = True
-
-
-
-#     if returnit:
-#         return {"root_exists":root_exists,
-#                 "EdotTsrel_exists":EdotTsrel_exists,
-#                 "datafile_exists":datafile_exists}
-#     else:
-#         print('Root exists \t\t: ',root_exists)
-#         print('EdotTsrel exists \t: ',EdotTsrel_exists)
-#         print('Data file exists \t: ',datafile_exists)
-
-
-
 #---------------------------------- Envelopes ----------------------------------
+
+def write_envelope(Rphotkm,env):
+    # Expecting env type namedtuple object
+
+    assert(env.rphot/1e5==Rphotkm)
+
+    path = 'envelopes/models/' + get_name(include_Prad=False) + '/'
+
+    if Rphotkm >= load_params()['R']+1:
+                filename = path + str(Rphotkm) + '.txt'
+    else:
+        filename = path + str(Rphotkm).replace('.','_') + '.txt'
+
+    with open(filename,'w') as f:
+
+        # Write header
+        f.write('{:<13s} \t {:<11s} \t {:<11s} \t\t Linf = {:<6e}\n'.format(
+            'r (cm)','rho (g/cm3)','T (K)',env.Linf))
+
+        for i in range(len(env.r)):
+            f.write('%0.8e \t %0.6e \t %0.6e \t'%
+                (env.r[i], env.rho[i], env.T[i]))    
+
+            f.write('\n')
+
+
+def load_envelope(Rphotkm, specific_file=None):
+
+    # output is Envelope namedtuple object       
+
+    # Sometimes because of numpy coversions 13 gets converted to 13.0 for example.
+    # We have to remove these zeros else the file isn't found
+    s = str(Rphotkm)
+    if '.' in s:
+        if len(s[s.find('.')+1:]) == 1: # this counts the number of char after '.' (#decimals)
+            if s[-1]=='0':
+                Rphotkm = round(eval(s))
+
+    if specific_file != None:
+        filename = specific_file
+    else:
+        path = 'envelopes/models/' + get_name(include_Prad=False) + '/'
+
+        if Rphotkm >= load_params()['R']+1:
+                    filename = path + str(Rphotkm) + '.txt'
+        else:
+            filename = path + str(Rphotkm).replace('.','_') + '.txt'
+
+    r, rho, T = [[] for i in range (3)]
+    with open(filename,'r') as f:
+        for i,line in enumerate(f): 
+            if i==0: 
+                Linf = float(line.split()[-1])
+            else:
+                append_vars(line,[r, rho, T])
+
+    r,rho,T = [np.array(var) for var in (r,rho,T)]
+
+    from envelopes.env_GR_FLD import Env
+    return Env(Rphotkm*1e5,Linf,r,T,rho)
+
+
+def save_rhophf0rel(Rphotkm, f0vals, rhophvalsA, rhophvalsB):
+
+    path = 'envelopes/roots/' + get_name(include_Prad=False)
+
+    if not os.path.exists(path):
+        os.mkdir(path)
+
+    filepath = path + '/rhophf0rel_' + str(Rphotkm) + '.txt'
+    if not os.path.exists(filepath):
+        f = open(filepath, 'w+')
+        f.write('{:<12s} \t {:<12s} \t {:<12s}\n'.format(
+                'f0', 'log10(rhophA)', 'log10(rhophB)'))
+    else:
+        f = open(filepath, 'a')
+
+    for f0, rhopha, rhophb in zip(f0vals, rhophvalsA, rhophvalsB):
+        f.write('{:<11.8f} \t {:<11.8f} \t {:<11.8f}\n'.format(
+                f0, np.log10(rhopha), np.log10(rhophb)))
+
+
+def load_rhophf0rel(Rphotkm):
+
+    s = str(Rphotkm)
+    if s[-2:]=='.0': s=s[:-2]
+
+    filepath = 'envelopes/roots/' + get_name(include_Prad=False) + '/rhophf0rel_' + s + '.txt'
+    if not os.path.exists(filepath):
+        return False,
+
+    else:
+        f0, rhophA, rhophB = [],[],[]
+        with open(filepath,'r') as f:
+            next(f)
+            for line in f:
+                f0.append(eval(line.split()[0]))
+                rhophA.append(10**eval(line.split()[1]))
+                rhophB.append(10**eval(line.split()[2])) # saved as log values in the file
+         
+        return True,f0,rhophA,rhophB
+
+
+def clean_rhophf0relfile(Rphotkm,warning=1):
+
+    # Find duplicates, and remove all but the latest root 
+    # (assuming the last one is the correct one)
+    # Sort from lowest to biggest f0
+
+    _,f0vals,rhophvalsA,rhophvalsB = load_rhophf0rel(Rphotkm)
+    new_f0vals = np.sort(np.unique(f0vals))[::-1] # largest f0 value first (to work correctly in the initial search in MakeEnvelope)
+
+    if list(new_f0vals) != list(f0vals):
+
+        v = []
+        for x in new_f0vals:
+            duplicates = np.argwhere(f0vals==x)
+            v.append(duplicates[-1][0]) # keeping the last one
+
+        new_rhophvalsA, new_rhophvalsB = [],[]
+        for i in v:
+            new_rhophvalsA.append(rhophvalsA[i])
+            new_rhophvalsB.append(rhophvalsB[i])
+
+        if warning:
+            o = input('EdotTsrel file will be overwritten. Proceed? (0 or 1) ')
+        else:
+            o = 1
+        if o:
+            filepath = 'envelopes/roots/'+get_name(include_Prad=False)+'/rhophf0rel_'+str(Rphotkm)+'.txt'
+            os.remove(filepath)
+
+            save_rhophf0rel(Rphotkm,new_f0vals,new_rhophvalsA,new_rhophvalsB)
+    
+
+
+#------------------------------------ Misc ------------------------------------
+
+def append_vars(line,varz): 
+    l=line.split()
+    for col,var in enumerate(varz):
+        var.append(float(l[col]))
+
+def change_param(key, new_value):
+
+    old_value = load_params()[key]
+
+    if type(old_value) == str:
+        old_value_string = old_value
+        new_value_string = new_value
+
+    else:
+
+        if old_value>100: # we are looking at y_inner which is formatted as '1e8'
+            old_value_string = '1e' + str(int(np.log10(old_value)))
+            new_value_string = '1e' + str(int(np.log10(new_value)))
+
+        elif old_value%1==0: # has no decimals
+            old_value_string = str(int(old_value))
+            new_value_string = str(int(new_value))
+
+        else:
+            old_value_string = str(old_value).rstrip('0') # remove trailing zeros if there are any
+            new_value_string = str(new_value).rstrip('0') # remove trailing zeros if there are any
+
+
+    new_file_contents = ""
+    with open('./params.txt','r') as f:
+        for line in f:
+            if key in line:
+                new_file_contents += line.replace(old_value_string,new_value_string)
+            else:
+                new_file_contents += line
+
+    print(new_file_contents)
+
+    with open('./params.txt','w') as f:
+        f.write(new_file_contents)
+
+def make_directories():
+    ''' Make directories according to model name '''
+    for D in ('winds/','envelopes/'):
+        path = D + 'models/' + get_name()
+        if not os.path.exists(path): 
+            os.mkdir(path)

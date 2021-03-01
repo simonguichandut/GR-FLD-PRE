@@ -23,22 +23,19 @@ sigmarad = 0.25*arad*c
 
 # Parameters
 params = IO.load_params()
-if params['FLD'] == False: 
-    sys.exit('This script is for FLD calculations')
 
 # Generate EOS class and methods
-eos = physics.EOS_FLD(params['comp'])
+eos = physics.EOS(params['comp'])
 
 
 # Mass-dependent parameters
-M,RNS,y_inner = params['M'],params['R'],params['y_inner']
+M,RNS,yb = params['M'],params['R'],params['yb']
 GM = 6.6726e-8*2e33*M
 LEdd = 4*np.pi*c*GM/eos.kappa0
 ZZ = (1-2*GM/(c**2*RNS*1e5))**(-1/2) # redshift
 g = GM/(RNS*1e5)**2 * ZZ
-P_inner = g*y_inner
+Pb = g*yb
 
-T_inner = 10**8.5
 rg = 2*GM/c**2 # gravitationnal radius
 
 # ----------------------------------------- General Relativity ------------------------------------------------
@@ -126,30 +123,30 @@ def Tstar(L, T, r, rho):
 
 def A(T):
     return 1+1.5*eos.cs2(T)/c**2
-def A_e(rho,T):  
-    pe,_,[alpha1,_,f] = eos.electrons(rho,T)
-    return 1 + 1.5*eos.cs2_I(T)/c**2 + pe/(rho*c**2)*(f/(f-1) - alpha1)
+# def A_e(rho,T):  
+#     pe,_,[alpha1,_,f] = eos.electrons(rho,T)
+#     return 1 + 1.5*eos.cs2_I(T)/c**2 + pe/(rho*c**2)*(f/(f-1) - alpha1)
 
-def B(T):
-    return eos.cs2(T)
-def B_e(rho,T): 
-    pe,_,[alpha1,alpha2,f] = eos.electrons(rho,T)
-    return eos.cs2_I(T) + pe/rho*(alpha1 + alpha2*f)
+# def B(T):
+#     return eos.cs2(T)
+# def B_e(rho,T): 
+#     pe,_,[alpha1,alpha2,f] = eos.electrons(rho,T)
+#     return eos.cs2_I(T) + pe/rho*(alpha1 + alpha2*f)
 
-def C(L,T,r,rho):
-    Lam,_,R = FLD_Lam(L,r,T,return_params=True)
-    b = eos.Beta(rho,T, lam=Lam, R=R)
-    return 1/Y(r) * L/LEdd * eos.kappa(rho,T)/eos.kappa0 * GM/r * \
-            (1 + b/(12*Lam*(1-b)))
+# def C(L,T,r,rho):
+#     Lam,_,R = FLD_Lam(L,r,T,return_params=True)
+#     b = eos.Beta(rho,T, lam=Lam, R=R)
+#     return 1/Y(r) * L/LEdd * eos.kappa(rho,T)/eos.kappa0 * GM/r * \
+#             (1 + b/(12*Lam*(1-b)))
 
-def C_e(L, T, r, rho):  
+# def C_e(L, T, r, rho):  
 
-    Lam,_,R = FLD_Lam(L,r,T,return_params=True)
-    _,_,[alpha1,_,_] = eos.electrons(rho,T)
-    bi,be = eos.Beta_I(rho, T, lam=Lam, R=R), eos.Beta_e(rho, T, lam=Lam, R=R)
+#     Lam,_,R = FLD_Lam(L,r,T,return_params=True)
+#     _,_,[alpha1,_,_] = eos.electrons(rho,T)
+#     bi,be = eos.Beta_I(rho, T, lam=Lam, R=R), eos.Beta_e(rho, T, lam=Lam, R=R)
 
-    return 1/Y(r) * L/LEdd * eos.kappa(rho,T)/eos.kappa0 * GM/r * \
-            (1 + (bi + alpha1*be)/(12*Lam*(1-bi-be)))
+#     return 1/Y(r) * L/LEdd * eos.kappa(rho,T)/eos.kappa0 * GM/r * \
+#             (1 + (bi + alpha1*be)/(12*Lam*(1-bi-be)))
 
 
 # -------------------------------------------- Calculate derivatives ---------------------------------------
@@ -199,13 +196,13 @@ def drho_thin(r,rho,Linf):
 # ---------------------------------------------- Integration -----------------------------------------------
 
 def Shoot_in(rspan, rho0, T0, Linf):
-    ''' Integrates in using r as the independent variable, until P=P_inner or 
+    ''' Integrates in using r as the independent variable, until P=Pb or 
         we diverge in the wrong direction. We want to match the location of 
-        p=p_inner to the NS radius '''
+        p=Pb to the NS radius '''
 
     inic = [rho0, T0]
 
-    def hit_innerPressure(r,Y,*args): return eos.pressure_e(Y[0],Y[1], lam=1/3, R=0)-P_inner
+    def hit_innerPressure(r,Y,*args): return eos.pressure(Y[0],Y[1], lam=1/3, R=0)-Pb
     hit_innerPressure.terminal = True # stop integrating at this point
 
     def hit_lowdensity(r,Y,*args): 
