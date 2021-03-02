@@ -22,67 +22,37 @@ sigmarad = 0.25*arad*c
 # Parameters
 params = IO.load_params()
 
-# Generate EOS class and methods
+# EOS class and methods
 eos = physics.EOS(params['comp'])
 
-# Mass-dependent parameters
+# General relativity functions
+gr = physics.GeneralRelativity(params['M'],eos)
+
+# Flux-limited diffusion
+fld = physics.FluxLimitedDiffusion(gr)
+
+# Gradient equation parameters
+F = physics.GradientParameters(params['M'],eos,gr,fld)
+
+LEdd = F.LEdd
+
+# Base boundary condition
 M,RNS,yb = params['M'],params['R'],params['yb']
 GM = 6.6726e-8*2e33*M
-LEdd = 4*np.pi*c*GM / eos.kappa0
 ZZ = (1-2*GM/(c**2*RNS*1e5))**(-1/2) # redshift
 g = GM/(RNS*1e5)**2 * ZZ
-P_inner = g*yb
-
-# Generate mass and eos dependent functions
-
-
-# Maximum density 
+Pb = g*yb
 rhomax = 1e7
 
-# # ------------------------- General Relativity -------------------------------
 
-# def gamma(v):
-#     return 1/np.sqrt(1-v**2/c**2)
-
-# def Swz(r):  # Schwartzchild metric term
-#     return (1-2*GM/c**2/r)
-
-# def Lcrit(r,rho,T): # local critical luminosity
-#     return LEdd * (eos.kappa0/eos.kappa(rho,T)) *Swz(r)**(-1/2)
-
-# # ----------------------- Flux-limited diffusion -----------------------------
-# # Modified version of Pomraning (1983) FLD prescription.  
-# # See Guichandut & Cumming (2020)
-
-# def FLD_Lambda(Lstar,r,v,T,return_params=False):
-
-#     L = Lcomoving(Lstar,r,v)
-#     Flux = L/(4*np.pi*r**2)
-#     x = Flux/(c*arad*T**4)  # 0 opt thick, 1 opt thin
-
-#     if isinstance(Lstar, (list,tuple,np.ndarray)): 
-#         if len(x[x>1])>0:
-#             raise Exception("Causality warning F>cE at %d locations"%len(x[x>1]))
-#     else:
-#         if x>1:
-#             # print('causality warning : F>cE')
-#             x=1-1e-9
-
-#     Lam = 1/12 * ( (2-3*x) + np.sqrt(-15*x**2 + 12*x + 4) )  # 1/3 thick , 0 thin
-#     R = x/Lam # 0 thick, 1/lam->inf thin
-
-#     if return_params:
-#         return Lam,x,R
-#     else:
-#         return Lam
-
+# ----------------------------- Wind specific ---------------------------------
 
 def solve_energy(r,v,T):
 
     if params['Prad'] == 'simple':
         # If Prad=aT^4 everywhere, the Edot equation is straightforward to solve for Lstar
-        rho = Mdot/(4*np.pi*r**2*Y(r, v)*v)
-        return Edot - Mdot*Y(r,v)*eos.H(rho,T,lam=1/3,R=0)
+        rho = Mdot/(4*np.pi*r**2*gr.Y(r, v)*v)
+        return Edot - Mdot*gr.Y(r,v)*eos.H(rho,T,lam=1/3,R=0)
 
 
     elif params['Prad'] == 'exact':
@@ -96,48 +66,16 @@ def solve_energy(r,v,T):
                 Lstar.append(solve_energy(r[i],v[i],T[i]))
             return Lstar    
 
-        rho = Mdot/(4*np.pi*r**2*Y(r, v)*v)
+        rho = Mdot/(4*np.pi*r**2*gr.Y(r, v)*v)
 
-        Lstar1 = Edot - Mdot*eos.H(rho, T, lam=1/3, R=0)*Y(r, v)   # optically thick
-        Lstar2 = Edot - Mdot*eos.H(rho, T, lam=1e-10, R=1e10)*Y(r, v)  # optically thin
+        Lstar1 = Edot - Mdot*eos.H(rho, T, lam=1/3, R=0)*gr.Y(r, v)   # optically thick
+        Lstar2 = Edot - Mdot*eos.H(rho, T, lam=1e-10, R=1e10)*gr.Y(r, v)  # optically thin
         def energy_error(Lstar):
-            Lam,_,R = FLD_Lambda(Lstar,r,v,T,return_params=True)
-            return Edot - Mdot*eos.H(rho, T, Lam, R)*Y(r, v) - Lstar
+            Lam,_,R = fld.Lambda(Lstar,r,v,T,return_params=True)
+            return Edot - Mdot*eos.H(rho, T, Lam, R)*gr.Y(r, v) - Lstar
 
         Lstar = brentq(energy_error, Lstar1, Lstar2, xtol=1e-6, rtol=1e-8) #brentq is fastest
         return Lstar
-
-# -------------------------- Paczynski&Proczynski ----------------------------
-
-# def Y(r, v):  # eq 2a
-#     return np.sqrt(Swz(r))*gamma(v)
-
-# def Lcomoving(Lstar,r,v):
-#     return Lstar/(1+v**2/c**2)/Y(r, v)**2
-
-# def taustar(r,rho,T):
-#     return rho*eos.kappa(rho,T)*r
-
-# def Tstar(Lstar, T, r, rho, v):  # eq 2b
-#     return Lstar/LEdd * eos.kappa(rho,T)/eos.kappa0 * GM/(4*r) * \
-#             3*rho/(arad*T**4) * (1+(v/c)**2)**(-1) * Y(r, v)**(-3)
-
-# def A(T):  # eq 5a
-#     return 1 + 1.5*eos.cs2(T)/c**2
-
-# def B(T):
-#     return eos.cs2(T)
-
-# def C(Lstar, T, r, rho, v):  
-
-#     lam,_,R = FLD_Lambda(Lstar,r,v,T,return_params=True)
-#     L = Lcomoving(Lstar,r,v)
-
-#     return 1/Y(r,v) * L/LEdd * eos.kappa(rho,T)/eos.kappa0 * GM/r * \
-#             (1 + eos.Beta(rho,T, lam=lam, R=R)/(12*lam*(1-eos.Beta(rho,T, lam=lam, R=R))))
-
-
-# ------------------------------- u(phi) ------------------------------------
 
 def uphi(phi, T, subsonic):
     ''' phi should never drop below 2, but numerically
@@ -148,32 +86,29 @@ def uphi(phi, T, subsonic):
     account : phi = sqrt(A)*mach + 1/sqrt(A)/mach '''
 
     if phi < 2.0:   
-        u = 1.0*np.sqrt(B(T)/np.sqrt(A(T)))
+        u = 1.0*np.sqrt(F.B(T)/np.sqrt(F.A(T)))
     else:
         if subsonic:
-            u = 0.5*phi*np.sqrt(B(T))*(1.0-np.sqrt(1.0-(2.0/phi)**2))/np.sqrt(A(T))
+            u = 0.5*phi*np.sqrt(F.B(T))*(1.0-np.sqrt(1.0-(2.0/phi)**2))/np.sqrt(F.A(T))
         else:
-            u = 0.5*phi*np.sqrt(B(T))*(1.0+np.sqrt(1.0-(2.0/phi)**2))/np.sqrt(A(T))
+            u = 0.5*phi*np.sqrt(F.B(T))*(1.0+np.sqrt(1.0-(2.0/phi)**2))/np.sqrt(F.A(T))
     return u
 
 # ----------------------------- Sonic point ---------------------------------
 
-def numerator(r, T, v):  # numerator of eq (4a)
+def numerator(r, T, v):  
     
-    rho = Mdot/(4*np.pi*r**2*Y(r, v)*v)     # eq 1a
-    # Lstar = Edot-Mdot*eos.H(rho, T)*Y(r, v) + Mdot*c**2   
-    # eq 1c, but Edot now means Edot + Mc^2
-
+    rho = Mdot/(4*np.pi*r**2*gr.Y(r, v)*v)     
     Lstar = solve_energy(r,v,T)
 
-    return gamma(v)**(-2) *\
-           (GM/r/Swz(r) * (A(T)-B(T)/c**2) - C(Lstar, T, r, rho, v) - 2*B(T))
+    return gr.gamma(v)**(-2) *\
+           (GM/r/gr.Swz(r) * (F.A(T)-F.B(T)/c**2) - F.C(Lstar, T, r, rho, v) - 2*F.B(T))
 
 def rSonic(Ts):
 
     rkeep1, rkeep2 = 0.0, 0.0
     npoints = 50
-    vs = np.sqrt(eos.cs2(Ts)/A(Ts))
+    vs = np.sqrt(eos.cs2(Ts)/F.A(Ts))
 
     # First check if sonic point would be below 2 x gravitational radius
     # NS radius should never be under 2rg anyway
@@ -219,18 +154,17 @@ def calculateVars_phi(r, T, phi, subsonic=False, return_all=False):
     else:
         u = uphi(phi, T, subsonic)
 
-    rho = Mdot/(4*np.pi*r**2*u*Y(r, u))
+    rho = Mdot/(4*np.pi*r**2*u*gr.Y(r, u))
     Lstar = solve_energy(r,u,T)   
 
     if not return_all:
         return u, rho, phi, Lstar
     else:
-        lam,_,R = FLD_Lambda(Lstar,r,v,T,return_params=True)
+        lam,_,R = fld.Lambda(Lstar,r,T,u,return_params=True)
         P = eos.pressure(rho, T, lam=lam, R=R)
-        L = Lcomoving(Lstar,r,u)
+        L = gr.Lcomoving(Lstar,r,u)
         cs = np.sqrt(eos.cs2(T))
-        taus = taustar(r,rho,T)
-        return u, rho, phi, Lstar, L, P, cs, taus, lam
+        return u, rho, phi, Lstar, L, P, cs, lam
 
 
 def calculateVars_rho(r, T, rho, return_all=False): 
@@ -239,24 +173,23 @@ def calculateVars_rho(r, T, rho, return_all=False):
     if isinstance(rho, (list, tuple, np.ndarray)):
         r, T, rho = np.array(r), np.array(T), np.array(rho)  
 
-    u = Mdot/np.sqrt((4*np.pi*r**2*rho)**2*Swz(r) + (Mdot/c)**2)
+    u = Mdot/np.sqrt((4*np.pi*r**2*rho)**2*gr.Swz(r) + (Mdot/c)**2)
     Lstar = solve_energy(r,u,T)   
 
     if not return_all:
         return u, rho, Lstar
     else:
 
-        lam,_,R = FLD_Lambda(Lstar,r,u,T,return_params=True)
+        lam,_,R = fld.Lambda(Lstar,r,u,T,return_params=True)
 
-        mach = u/np.sqrt(B(T))
-        phi = np.sqrt(A(T))*mach + 1/(np.sqrt(A(T))*mach)
+        mach = u/np.sqrt(F.B(T))
+        phi = np.sqrt(F.A(T))*mach + 1/(np.sqrt(F.A(T))*mach)
         P = eos.pressure(rho, T, lam=lam, R=R)    
 
-        L = Lcomoving(Lstar,r,u)
+        L = gr.Lcomoving(Lstar,r,u)
         cs = np.sqrt(eos.cs2(T))
-        taus = taustar(r,rho,T)
     
-        return u, rho, phi, Lstar, L, P, cs, taus, lam
+        return u, rho, phi, Lstar, L, P, cs, lam
    
 
 def dr(r, y, subsonic):
@@ -266,15 +199,15 @@ def dr(r, y, subsonic):
     T, phi = y[:2]
     u, rho, phi, Lstar = calculateVars_phi(r, T, phi=phi, subsonic=subsonic)
 
-    Lam = FLD_Lambda(Lstar,r,u,T)
-    dlnT_dlnr = -Tstar(Lstar, T, r, rho, u) / (3*Lam) - 1/Swz(r) * GM/c**2/r  
+    Lam = fld.Lambda(Lstar,r,u,T)
+    dlnT_dlnr = -F.Tstar(Lstar, T, r, rho, u) / (3*Lam) - 1/gr.Swz(r) * GM/c**2/r  
     # remove small dv_dr term which has numerical problems near sonic point
     dT_dr = T/r * dlnT_dlnr
 
-    mach = u/np.sqrt(B(T))
-    dphi_dr = (A(T)*mach**2 - 1) *\
-        ( 3*B(T) - 2*A(T)*c**2) / (4*mach*A(T)**(3/2)*c**2*r) * dlnT_dlnr \
-        - numerator(r, T, u) / (u*r*np.sqrt(A(T)*B(T)) )
+    mach = u/np.sqrt(F.B(T))
+    dphi_dr = (F.A(T)*mach**2 - 1) *\
+        ( 3*F.B(T) - 2*F.A(T)*c**2) / (4*mach*F.A(T)**(3/2)*c**2*r) * dlnT_dlnr \
+        - numerator(r, T, u) / (u*r*np.sqrt(F.A(T)*F.B(T)) )
     
     return [dT_dr, dphi_dr]
 
@@ -289,12 +222,12 @@ def drho(rho, y):
     u, rho, Lstar = calculateVars_rho(r, T, rho = rho)
 
     # Not using phi
-    dlnT_dlnr = -Tstar(Lstar, T, r, rho, u) - 1/Swz(r) * GM/c**2/r
+    dlnT_dlnr = -F.Tstar(Lstar, T, r, rho, u) - 1/gr.Swz(r) * GM/c**2/r
     dT_dr = T/r * dlnT_dlnr
 
     # eq 6 from Paczynski
-    dlnr_dlnrho = (B(T) - A(T)*u**2) / \
-            ((2*u**2 - (GM/(r*Y(r, u)**2))) * A(T) + C(Lstar, T, r, rho, u)) 
+    dlnr_dlnrho = (F.B(T) - F.A(T)*u**2) / \
+            ((2*u**2 - (GM/(r*gr.Y(r, u)**2))) * F.A(T) + F.C(Lstar, T, r, rho, u)) 
 
     dr_drho = r/rho * dlnr_dlnrho
     dT_drho = dT_dr * dr_drho
@@ -375,12 +308,12 @@ def innerIntegration_rho(rho95, T95, returnResult=False):
         # Will be optically thick there so no worries with FLD
         T = y[0]
         P = eos.pressure(rho,T,lam=1/3,R=0)
-        return P-P_inner
+        return P-Pb
     hit_Pinner.terminal = True
 
     def hit_zerospeed(rho,y):           # Don't want u to change sign
         r = y[1]
-        u = Mdot/np.sqrt((4*np.pi*r**2*rho)**2*Swz(r) + (Mdot/c)**2)
+        u = Mdot/np.sqrt((4*np.pi*r**2*rho)**2*gr.Swz(r) + (Mdot/c)**2)
         return u
     hit_zerospeed.terminal = True        
 
@@ -414,7 +347,7 @@ def innerIntegration_rho(rho95, T95, returnResult=False):
 
         else:
             flag_u0 = 1
-            p = hit_Pinner(sol.t[-1],sol.y[-1]) + P_inner
+            p = hit_Pinner(sol.t[-1],sol.y[-1]) + Pb
             col = p/g
             if verbose: print('Zero velocity before pressure condition reached.\
                                 Last pressure : %.3e (y = %.3e)\n'%(p,col))
@@ -437,8 +370,9 @@ def innerIntegration_rho(rho95, T95, returnResult=False):
 
 # A named tuple allows us to access arrays by their variable name, 
 # while also being able to tuple unpack to get everything
+
 Wind = namedtuple('Wind',
-            ['rs','rph','r','T','rho','u','phi','Lstar','L','P','cs','taus','lam'])  
+            ['rs','rph','Edot','r','T','rho','u','Lstar'])  
 
 def setup_globals(root,logMdot,Verbose=False,return_them=False):
     global Mdot, Edot, Ts, rs, verbose
@@ -691,11 +625,8 @@ def MakeWind(root, logMdot, Verbose=0, IgnoreErrors = False):
     x = F/(arad*c*T**4)
     rph = r[np.argmin(abs(x - 0.25))]
 
-    return Wind(rs, rph, r, T, rho, u, phi, Lstar, L, P, cs, taus ,lam)
-
-
-
-
+    return Wind(rs, rph, Edot, r, T, rho, u, Lstar)
+ 
 
 # # For testing when making modifications to this script
 

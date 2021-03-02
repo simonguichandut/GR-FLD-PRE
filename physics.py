@@ -111,18 +111,15 @@ class EOS:
 
 
 
-class Methods():
+class GeneralRelativity():
 
     def __init__(self, M, eos):
 
         self.M = M
         self.eos = eos
-
         self.GM = 6.6726e-8*2e33*M
         self.LEdd = 4*pi*c*self.GM / self.eos.kappa0
 
-
-    # ------------------------- General Relativity -------------------------------
 
     def Swz(self, r):                # Schwartzchild metric term
         return (1-2*self.GM/c**2/r)
@@ -140,20 +137,24 @@ class Methods():
         return Lstar/(1+v**2/c**2)/self.Y(r, v)**2
 
 
-    # ------------------------- Flux-limited diffusion ----------------------------
 
-    def FLD_x(self, Lstar, r, T, v):
+class FluxLimitedDiffusion():
 
-        L = self.Lcomoving(Lstar,r,v)
+    def __init__(self, GR):
+        self.GR = GR # GeneralRelativity class gives Lcomoving
+
+    def x(self, Lstar, r, T, v):
+
+        L = self.GR.Lcomoving(Lstar,r,v)
         Flux = L/(4*pi*r**2)
         x = Flux/(c*arad*T**4)  # 0 opt thick, 1 opt thin
 
         return x
 
 
-    def FLD_Lambda(self, Lstar, r, T, v, return_params=False):
+    def Lambda(self, Lstar, r, T, v, return_params=False):
 
-        x = self.FLD_x(Lstar,r,T,v)
+        x = self.x(Lstar,r,T,v)
 
         if isinstance(Lstar, (list,tuple,ndarray)): 
             if len(x[x>1])>0:
@@ -172,7 +173,16 @@ class Methods():
             return Lam
 
 
-    # ---------------------- Gradient equation parameters -------------------------
+class GradientParameters():
+
+    def __init__(self,M,eos,GR,FLD):
+
+        self.eos = eos        
+        self.GM = 6.6726e-8*2e33*M
+        self.LEdd = 4*pi*c*self.GM / self.eos.kappa0
+
+        self.GR = GR
+        self.FLD = FLD
 
     def A(self, T): 
         return 1 + 1.5*self.eos.cs2(T)/c**2
@@ -182,16 +192,16 @@ class Methods():
 
     def C(self, Lstar, T, r, rho, v):  
 
-        lam,_,R = self.FLD_Lambda(Lstar,r,v,T,return_params=True)
-        L = self.Lcomoving(Lstar,r,v)
+        lam,_,R = self.FLD.Lambda(Lstar,r,T,v,return_params=True)
+        L = self.GR.Lcomoving(Lstar,r,v)
 
-        return 1/self.Y(r,v) * L/self.LEdd * self.eos.kappa(rho,T)/self.eos.kappa0 * self.GM/r * \
+        return 1/self.GR.Y(r,v) * L/self.LEdd * self.eos.kappa(rho,T)/self.eos.kappa0 * self.GM/r * \
                 (1 + self.eos.Beta(rho,T, lam=lam, R=R)/(12*lam*(1-self.eos.Beta(rho,T, lam=lam, R=R))))
 
     def Tstar(self, Lstar, T, r, rho, v): 
 
-        lam,_,_ = self.FLD_Lambda(Lstar,r,v,T,return_params=True)
-        L = self.Lcomoving(Lstar,r,v)
+        lam,_,_ = self.FLD.Lambda(Lstar,r,T,v,return_params=True)
+        L = self.GR.Lcomoving(Lstar,r,v)
 
-        return 1/(self.Y(r,v)*lam) * L/self.LEdd * self.eos.kappa(rho,T)/self.eos.kappa0 \
+        return 1/(self.GR.Y(r,v)*lam) * L/self.LEdd * self.eos.kappa(rho,T)/self.eos.kappa0 \
                  * self.GM/(4*r) * rho/(arad*T**4)

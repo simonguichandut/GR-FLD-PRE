@@ -158,24 +158,26 @@ def write_wind(logMdot,wind):
 
     path = 'winds/models/' + get_name() + '/'
     filename = path + ('%.2f'%logMdot) + '.txt'
+    # filename = path + ('%.2f'%logMdot) + 'TEMP.txt'
 
     with open(filename,'w') as f:
 
         # Write header
-        f.write(('{:<11s} \t'*11).format(
-            'r (cm)','T (K)','rho (g/cm3)','P (dyne/cm2)','u (cm/s)',
-            'cs (cm/s)','phi','L (erg/s)','L* (erg/s)','taus','lambda'))
+        f.write(('{:<11s} \t'*5 + '\t\t Edot= {:<6e}').format(
+            'r (cm)','rho (g/cm3)','T (K)','u (cm/s)','L* (erg/s)',wind.Edot))
 
         f.write('\n')
 
         # Write values
         for i in range(len(wind.r)):
-            f.write(('%0.6e \t'*11)%(
-                wind.r[i], wind.T[i], wind.rho[i], wind.P[i], wind.u[i],
-                wind.cs[i], wind.phi[i], wind.L[i], wind.Lstar[i], wind.taus[i], wind.lam[i]))
+            f.write(('%0.6e \t'*5)%(
+                wind.r[i], wind.rho[i], wind.T[i], wind.u[i], wind.Lstar[i]))
 
             if wind.r[i] == wind.rs:
                 f.write('sonic point')
+
+            if wind.r[i] == wind.rph:
+                f.write('photospheric radius')
 
             f.write('\n')
 
@@ -192,29 +194,28 @@ def load_wind(logMdot, specific_file=None):
         path = 'winds/models/' + get_name() + '/'
         filename = path + ('%.2f'%logMdot) + '.txt'
 
-    r,T,rho,P,u,cs,phi,L,Lstar,taus,lam = [[] for i in range(11)]
-    varz = [r,T,rho,P,u,cs,phi,L,Lstar,taus,lam]
+    r,rho,T,u,Lstar = [[] for i in range(5)]
+    varz = (r,rho,T,u,Lstar)
     with open(filename, 'r') as f:
-        next(f)
-        for line in f:
-            append_vars(line, varz)
+        for i,line in enumerate(f):
 
-            if line.split()[-1] == 'point': 
-                rs = eval(line.split()[0])
+            if i==0:
+                Edot = float(line.split()[-1])
+            
+            else:
+                append_vars(line, varz)
 
-    r,T,rho,P,u,cs,phi,L,Lstar,taus,lam = (np.array(var) for var in varz)
+                if line.split()[-1] == 'point': 
+                    rs = eval(line.split()[0])
+                elif line.split()[-1] == 'radius':
+                    rph = eval(line.split()[0])
 
-    # Locate photosphere (should be in written down in text file like rs in the future)
-    arad = 7.5657e-15
-    c = 2.99792458e10
-    F = L/(4*np.pi*r**2)
-    x = F/(arad*c*T**4)
-    rph = r[np.argmin(abs(x - 0.25))]
+    r,rho,T,u,Lstar = np.array(varz)
 
 
     # Return as wind tuple object
     from winds.wind_GR_FLD import Wind
-    return Wind(rs, rph, r, T, rho, u, phi, Lstar, L, P, cs, taus, lam)
+    return Wind(rs, rph, Edot, r, T, rho, u, Lstar)
 
 
 def save_EdotTsrel(logMdot, Edotvals, TsvalsA, TsvalsB, decimals=8):
@@ -371,7 +372,7 @@ def load_envelope(Rphotkm, specific_file=None):
             else:
                 append_vars(line,[r, rho, T])
 
-    r,rho,T = [np.array(var) for var in (r,rho,T)]
+    r,rho,T = np.array((r,rho,T))
 
     from envelopes.env_GR_FLD import Env
     return Env(Rphotkm*1e5,Linf,r,T,rho)
@@ -500,3 +501,42 @@ def make_directories():
         path = D + 'models/' + get_name()
         if not os.path.exists(path): 
             os.mkdir(path)
+
+
+def load_wind_old(logMdot, specific_file=None):
+
+    ''' Note to self : If wind text files are from old code, use this because the files are formatted different '''
+
+    if specific_file != None:
+        filename = specific_file
+    else:
+        path = 'winds/models/' + get_name() + '/'
+        filename = path + ('%.2f'%logMdot) + '.txt'
+
+    r,T,rho,P,u,cs,phi,L,Lstar,taus,lam = [[] for i in range(11)]
+    varz = [r,T,rho,P,u,cs,phi,L,Lstar,taus,lam]
+    with open(filename, 'r') as f:
+        next(f)
+        for line in f:
+            append_vars(line, varz)
+
+            if line.split()[-1] == 'point': 
+                rs = eval(line.split()[0])
+
+    r,T,rho,P,u,cs,phi,L,Lstar,taus,lam = (np.array(var) for var in varz)
+
+    # Locate photosphere (should be in written down in text file like rs in the future)
+    arad = 7.5657e-15
+    c = 2.99792458e10
+    F = L/(4*np.pi*r**2)
+    x = F/(arad*c*T**4)
+    rph = r[np.argmin(abs(x - 0.25))]
+
+    # Calculate Edot
+    import physics
+    LEdd = 4*np.pi*c*6.6726e-8*2e33*load_params()['M'] / physics.EOS(load_params()['comp'])
+    Edot = load_wind_roots(logMdot)[0]*LEdd + 10**logMdot*c**2
+
+    # Return as wind tuple object
+    from winds.wind_GR_FLD import Wind
+    return Wind(rs, rph, Edot, r, T, rho, u, Lstar)
