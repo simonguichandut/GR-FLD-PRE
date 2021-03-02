@@ -15,8 +15,8 @@ alpha = 0.86
 yb = 1e8
 gyb = 6.6726e-8*M/R**2 * yb
 
-from physics import *
-eos = EOS(comp='He')
+from physics import EquationOfState
+eos = EquationOfState(comp='He')
 
 # In the derivation, we find an expession for rho(T,x)
 def rho(T,x):

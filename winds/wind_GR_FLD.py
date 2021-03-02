@@ -23,10 +23,10 @@ sigmarad = 0.25*arad*c
 params = IO.load_params()
 
 # EOS class and methods
-eos = physics.EOS(params['comp'])
+eos = physics.EquationOfState(params['comp'])
 
 # General relativity functions
-gr = physics.GeneralRelativity(params['M'],eos)
+gr = physics.GeneralRelativity(params['M'])
 
 # Flux-limited diffusion
 fld = physics.FluxLimitedDiffusion(gr)
@@ -71,7 +71,7 @@ def solve_energy(r,v,T):
         Lstar1 = Edot - Mdot*eos.H(rho, T, lam=1/3, R=0)*gr.Y(r, v)   # optically thick
         Lstar2 = Edot - Mdot*eos.H(rho, T, lam=1e-10, R=1e10)*gr.Y(r, v)  # optically thin
         def energy_error(Lstar):
-            Lam,_,R = fld.Lambda(Lstar,r,v,T,return_params=True)
+            Lam,_,R = fld.Lambda(Lstar,r,T,v,return_params=True)
             return Edot - Mdot*eos.H(rho, T, Lam, R)*gr.Y(r, v) - Lstar
 
         Lstar = brentq(energy_error, Lstar1, Lstar2, xtol=1e-6, rtol=1e-8) #brentq is fastest
@@ -180,7 +180,7 @@ def calculateVars_rho(r, T, rho, return_all=False):
         return u, rho, Lstar
     else:
 
-        lam,_,R = fld.Lambda(Lstar,r,u,T,return_params=True)
+        lam,_,R = fld.Lambda(Lstar,r,T,u,return_params=True)
 
         mach = u/np.sqrt(F.B(T))
         phi = np.sqrt(F.A(T))*mach + 1/(np.sqrt(F.A(T))*mach)
@@ -199,7 +199,7 @@ def dr(r, y, subsonic):
     T, phi = y[:2]
     u, rho, phi, Lstar = calculateVars_phi(r, T, phi=phi, subsonic=subsonic)
 
-    Lam = fld.Lambda(Lstar,r,u,T)
+    Lam = fld.Lambda(Lstar,r,T,u)
     dlnT_dlnr = -F.Tstar(Lstar, T, r, rho, u) / (3*Lam) - 1/gr.Swz(r) * GM/c**2/r  
     # remove small dv_dr term which has numerical problems near sonic point
     dT_dr = T/r * dlnT_dlnr

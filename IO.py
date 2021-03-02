@@ -2,7 +2,6 @@
 
 import os
 import numpy as np
-import sys
 
 #------------------------------------ Core ------------------------------------
 
@@ -64,8 +63,7 @@ def get_envelope_list():
     sorted_list_clean = [int(x) if str(x)[-1]=='0' else x for x in sorted_list] # changes 15.0 to 15 for filename cleanliness
     return sorted_list_clean
 
-
-
+    
 #------------------------------------ Winds ------------------------------------
 
 def save_wind_root(logMdot,root,decimals=8):
@@ -320,7 +318,7 @@ def clean_EdotTsrelfile(logMdot,warning=1):
 def write_envelope(Rphotkm,env):
     # Expecting env type namedtuple object
 
-    assert(env.rphot/1e5==Rphotkm)
+    assert(env.rph/1e5==Rphotkm)
 
     path = 'envelopes/models/' + get_name(include_Prad=False) + '/'
 
@@ -501,6 +499,65 @@ def make_directories():
         path = D + 'models/' + get_name()
         if not os.path.exists(path): 
             os.mkdir(path)
+
+
+def export_grid(target = "."):
+
+    ''' Export values of grid of models to target directory. Columns are Lbase (erg/s), Mdot, Edot (=Linf for envelopes)
+        rs (=x for envelopes), rph, rhob, Tb, Teff '''
+
+    if target[-1]!='/': target += '/'
+    filename = target + 'grid_' + get_name(include_Prad=False)+'.txt'
+
+    # Need GR functions to calculate local luminosities
+    from physics import GeneralRelativity
+    gr = GeneralRelativity(load_params()['M'])
+
+    with open(filename, 'w') as f:
+
+        # Header
+        f.write(('{:<10s}    '*7 +'{:<10s}\n').format(
+        'Lbinf (erg/s)','Mdot (g/s)','Edot (g/s)','rs (cm)','rph (cm)','rhob (g/cm3)','Tb (K)','Teff (K)'))
+
+        # Envelopes
+        for Rphotkm in get_envelope_list():
+            env = load_envelope(Rphotkm)
+
+            # Base luminosity
+            f.write('%0.4e       ' % env.Linf)
+
+            # Mdot,Edot
+            f.write('0' + ' '*13 + '%0.4e    '%env.Linf)
+
+            # rs,rph
+            f.write('0' + ' '*13 + '%0.4e    ' % env.rph)
+
+            # Base rho,T
+            f.write('%0.4e      %0.4e    '%(env.rho[0],env.T[0]))
+
+            # Teff (T(rph))
+            f.write('%0.4e\n'%env.T[list(env.r).index(env.rph)])
+
+        # Winds
+        for logMdot in get_wind_list():
+            w = load_wind(logMdot)
+
+            # Base luminosity
+            f.write('%0.4e       ' % w.Lstar[0])
+
+            # Mdot,Edot
+            f.write('%0.4e    %.4e    '%(10**logMdot,w.Edot))
+
+            # rs,rph
+            f.write('%0.4e    %.4e    '%(w.rs,w.rph))
+
+            # Base rho,T
+            f.write('%0.4e      %0.4e    '%(w.rho[0],w.T[0]))
+
+            # Teff (T(rph))
+            f.write('%0.4e\n'%w.T[list(w.r).index(w.rph)])
+
+            
 
 
 def load_wind_old(logMdot, specific_file=None):

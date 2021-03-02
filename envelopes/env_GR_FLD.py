@@ -11,70 +11,39 @@ import physics
 from scipy.interpolate import InterpolatedUnivariateSpline as IUS 
 
 
-# --------------------------------------- Constants and parameters --------------------------------------------
+# ----------------------- Constants and parameters ---------------------------
 
 # Constants
-kB = 1.380658e-16
 arad = 7.5657e-15
 c = 2.99792458e10
-mp = 1.67e-24
-kappa0 = 0.2
 sigmarad = 0.25*arad*c
+kB = 1.380658e-16
+mp = 1.67e-24
 
 # Parameters
 params = IO.load_params()
 
-# Generate EOS class and methods
-eos = physics.EOS(params['comp'])
+# EOS class and methods
+eos = physics.EquationOfState(params['comp'])
 
+# General relativity functions
+gr = physics.GeneralRelativity(params['M'])
 
-# Mass-dependent parameters
+# Flux-limited diffusion
+fld = physics.FluxLimitedDiffusion(gr)
+
+# Gradient equation parameters
+F = physics.GradientParameters(params['M'],eos,gr,fld)
+
+LEdd = F.LEdd
+
+# Base boundary condition
 M,RNS,yb = params['M'],params['R'],params['yb']
 GM = 6.6726e-8*2e33*M
-LEdd = 4*np.pi*c*GM/eos.kappa0
 ZZ = (1-2*GM/(c**2*RNS*1e5))**(-1/2) # redshift
 g = GM/(RNS*1e5)**2 * ZZ
 Pb = g*yb
-
-rg = 2*GM/c**2 # gravitationnal radius
-
-# ----------------------------------------- General Relativity ------------------------------------------------
-
-def Swz(r):  # Schwartzchild metric term
-    return (1-2*GM/c**2/r)     
-
-def grav(r): # local gravity
-    return GM/r**2 * Swz(r)**(-1/2)
-
-def Lcr(r,rho,T):
-    return 4*np.pi*c*GM/eos.kappa(rho,T)*(1-rg/r)**(-1/2)
-
-# ----------------------- Flux-limited diffusion -----------------------------
-# Modified version of Pomraning (1983) FLD prescription.  
-# See Guichandut & Cumming (2020)
-
-def FLD_Lam(L,r,T,return_params=False):
-
-    # L is the local luminosity. In envelopes, Linf is constant, L=Linf*(1-rs/r)**(-1)
-
-    Flux = L/(4*np.pi*r**2)
-    alpha = Flux/(c*arad*T**4)  # 0 opt thick, 1 opt thin
-
-    if isinstance(L, (list,tuple,np.ndarray)): 
-        if len(alpha[alpha>1])>0:
-            raise Exception("Causality warning F>cE at %d locations"%len(alpha[alpha>1]))
-    else:
-        if alpha>1:
-            # print('causality warning : F>cE')
-            alpha=1-1e-9
-
-    Lam = 1/12 * ( (2-3*alpha) + np.sqrt(-15*alpha**2 + 12*alpha + 4) )  # 1/3 thick , 0 thin
-    R = alpha/Lam # 0 thick, 1/lam->inf thin
-
-    if return_params:
-        return Lam,alpha,R
-    else:
-        return Lam
+rhomax = 1e7
 
 
 # ----------------------------------------- Initial conditions ------------------------------------------------
@@ -85,7 +54,7 @@ def photosphere(Rphot,f0):
         Also sets Linf, the luminosity seen by observers at infinity '''
 
     def Teff_eq(T): 
-        return eos.kappa(0.,T) - (GM*c/(Rphot**2*sigmarad) * Swz(Rphot)**(-1/2) * (1-10**f0))/T**4  # Assuming 0 density for opacity, which is no problem at photosphere
+        return eos.kappa(0.,T) - (GM*c/(Rphot**2*sigmarad) * gr.Swz(Rphot)**(-1/2) * (1-10**f0))/T**4  # Assuming 0 density for opacity, which is no problem at photosphere
 
     Tkeep1, Tkeep2 = 0.0, 0.0
     npoints = 10
@@ -100,53 +69,15 @@ def photosphere(Rphot,f0):
         npoints += 10
 
     T = brentq(Teff_eq, Tkeep1, Tkeep2, xtol=1e-10, maxiter=10000)
-    rho = 2/3 * eos.mu*mp/(kB*T) * grav(Rphot)/eos.kappa(0.,T) * 10**f0          
-    Linf = 4*np.pi*Rphot**2*sigmarad*T**4* Swz(Rphot)
+    rho = 2/3 * eos.mu*mp/(kB*T) * gr.grav(Rphot)/eos.kappa(0.,T) * 10**f0          
+    Linf = 4*np.pi*Rphot**2*sigmarad*T**4* gr.Swz(Rphot)
 
     return rho,T,Linf
 
 def get_f0(Rphot,Tphot,Linf): # the opposite of what photosphere does, i.e find f0 based on Linf and values at photosphere
-    Lph = Linf*Swz(Rphot)**(-1)
-    Lcrph = 4*np.pi*c*GM/eos.kappa(0.,Tphot)*(1-rg/Rphot)**(-1/2)
+    Lph = Linf*gr.Swz(Rphot)**(-1)
+    Lcrph = gr.Lcrit(Rphot,0,Tpho,eos)
     return np.log10(1-Lph/Lcrph)
-
-
-
-# --------------------------------------- Wind structure equations (v=0) ---------------------------------------
-
-def Y(r): 
-    return np.sqrt(Swz(r)) # v=0
-
-def Tstar(L, T, r, rho):  
-    return L/LEdd * eos.kappa(rho,T)/eos.kappa0 * GM/(4*r) *\
-            3*rho/(arad*T**4) * Y(r)**(-1)
-
-def A(T):
-    return 1+1.5*eos.cs2(T)/c**2
-# def A_e(rho,T):  
-#     pe,_,[alpha1,_,f] = eos.electrons(rho,T)
-#     return 1 + 1.5*eos.cs2_I(T)/c**2 + pe/(rho*c**2)*(f/(f-1) - alpha1)
-
-# def B(T):
-#     return eos.cs2(T)
-# def B_e(rho,T): 
-#     pe,_,[alpha1,alpha2,f] = eos.electrons(rho,T)
-#     return eos.cs2_I(T) + pe/rho*(alpha1 + alpha2*f)
-
-# def C(L,T,r,rho):
-#     Lam,_,R = FLD_Lam(L,r,T,return_params=True)
-#     b = eos.Beta(rho,T, lam=Lam, R=R)
-#     return 1/Y(r) * L/LEdd * eos.kappa(rho,T)/eos.kappa0 * GM/r * \
-#             (1 + b/(12*Lam*(1-b)))
-
-# def C_e(L, T, r, rho):  
-
-#     Lam,_,R = FLD_Lam(L,r,T,return_params=True)
-#     _,_,[alpha1,_,_] = eos.electrons(rho,T)
-#     bi,be = eos.Beta_I(rho, T, lam=Lam, R=R), eos.Beta_e(rho, T, lam=Lam, R=R)
-
-#     return 1/Y(r) * L/LEdd * eos.kappa(rho,T)/eos.kappa0 * GM/r * \
-#             (1 + (bi + alpha1*be)/(12*Lam*(1-bi-be)))
 
 
 # -------------------------------------------- Calculate derivatives ---------------------------------------
@@ -159,13 +90,10 @@ def derivs(r,y,Linf):
     # if rho<0:   
     #     rho=1e-10
 
-    L = Linf*Swz(r)**(-1)
-    Lam = FLD_Lam(L,r,T)
-    # print('r=%.3e \t rho=%.3e \t T=%.3e \t lam=%.3f'%(r,rho,T,Lam))
+    Lam = fld.Lambda(Linf,r,T,v=0)
 
-    dlnT_dlnr = -Tstar(L, T, r, rho) / (3*Lam) - 1/Swz(r) * GM/c**2/r
-    # dlnrho_dlnr = (-GM/Swz(r)/r * A_e(rho,T) + C_e(L,T,r,rho))/B_e(rho,T)
-    dlnrho_dlnr = (-GM/Swz(r)/r * A(T) + C(L,T,r,rho))/B(T)
+    dlnT_dlnr = -F.Tstar(Linf, T, r, rho, v=0) / (3*Lam) - 1/gr.Swz(r) * GM/c**2/r
+    dlnrho_dlnr = (-GM/gr.Swz(r)/r * F.A(T) + F.C(Linf,T,r,rho,v=0))/F.B(T)
 
     dT_dr = T/r * dlnT_dlnr
     drho_dr = rho/r * dlnrho_dlnr
@@ -175,22 +103,21 @@ def derivs(r,y,Linf):
 # --------------------------------------- Optically thin limit ---------------------------------------
 
 def T_thin(Linf,r):
-    return ( Linf*Swz(r)**(-1) / (4*np.pi*r**2*arad*c) )**0.25
+    return ( gr.Lcomoving(Linf,r,v=0) / (4*np.pi*r**2*arad*c) )**0.25
 
 def drho_thin(r,rho,Linf):
 
-    L = Linf*Swz(r)**(-1)
+    L = gr.Lcomoving(Linf,r,v=0)
     T = T_thin(Linf,r)
 
     Flux = L/(4*np.pi*r**2)
     alpha = Flux/(c*arad*T**4)  
 
-    # Lam = eos.kappa(rho,T)*rho*r/2/Y(r)  # optically thin limit of lambda (it's not exactly zero)
-    Lam = eos.kappa0*rho*r/2/Y(r)  # optically thin limit of lambda (it's not exactly zero)
+    Lam = eos.kappa0*rho*r/2/gr.Y(r,v=0)  # optically thin limit of lambda (it's not exactly zero)
     b = eos.Beta(rho,T, lam=Lam, R=alpha/Lam)
-    C =  1/Y(r) * L/LEdd * eos.kappa(rho,T)/eos.kappa0 * GM/r * (1 + b/(12*Lam*(1-b)))
+    C =  1/gr.Y(r,v=0) * L/LEdd * eos.kappa(rho,T)/eos.kappa0 * GM/r * (1 + b/(12*Lam*(1-b)))
 
-    dlnrho_dlnr = (-GM/Swz(r)/r * A(T) + C)/B(T)
+    dlnrho_dlnr = (-GM/gr.Swz(r)/r * F.A(T) + C)/F.B(T)
     return rho/r * dlnrho_dlnr
     
 # ---------------------------------------------- Integration -----------------------------------------------
@@ -242,7 +169,7 @@ def Shoot_out(rspan, rho0, T0, Linf, rtol=1e-6, max_step=1e5):
 
     def hit_density_mountains(r,y,*args):
         rho,T = y
-        dlnrho_dlnr = (-GM/Swz(r)/r * A(T) + C(Linf*Swz(r)**(-1),T,r,rho))/B(T)
+        dlnrho_dlnr = (-GM/gr.Swz(r)/r * F.A(T) + F.C(Linf,T,r,rho,v=0))/F.B(T)
         # if dlnrho_dlnr>0: print(dlnrho_dlnr)
         return dlnrho_dlnr
     hit_density_mountains.direction = -1
@@ -268,10 +195,10 @@ def Shoot_out_thin(rvec, rho0, Linf, rtol=1e-6, rho_min=1e-10):
         return y[0]-rho_min      
     hit_minimum_density.terminal = True
 
-    T = ( Linf*Swz(rvec)**(-1) / (4*np.pi*rvec**2*arad*c) )**0.25
+    T = ( Linf*gr.Swz(rvec)**(-1) / (4*np.pi*rvec**2*arad*c) )**0.25
     sol = solve_ivp(drho_thin, t_span=(rvec[0],rvec[-1]), y0=(rho0,), args=(Linf,), 
             events = (hit_minimum_density), method='Radau', dense_output=True, 
-            rtol=rtol, max_step = max_step)
+            rtol=rtol)
     rho = sol.sol(rvec)[0]
 
     print('density zero at r=%.4f km'%(sol.t[-1]/1e5))
@@ -282,7 +209,7 @@ def Shoot_out_thin(rvec, rho0, Linf, rtol=1e-6, rho_min=1e-10):
 # ------------------------------------------------- Envelope ---------------------------------------------------
 
 Env = namedtuple('Env',
-            ['rphot','Linf','r','T','rho'])
+            ['rph','Linf','r','T','rho'])
 
 def get_rhophf0rel(Rphotkm, rend=1e9, tol=1e-6, Verbose=0, f0min=-4.5, f0max=-3.7, npts=40, spacing='linear'):
 
@@ -571,7 +498,7 @@ def MakeEnvelope(Rphotkm, rend=1e9, Verbose=False, tol=1e-4, return_stuff=False)
 
     global Linf             # that way Linf does not have to always be a function input parameter
     Rphot = Rphotkm*1e5
-    rspan = (Rphot , 1.01*rg)                       # rspan is the integration range
+    rspan = (Rphot , 1.01*gr.rg)                       # rspan is the integration range
 
     stuff = []
 
@@ -695,12 +622,10 @@ def MakeEnvelope(Rphotkm, rend=1e9, Verbose=False, tol=1e-4, return_stuff=False)
             if Verbose: 
                 print('We begin the bissection with values for the photoshere')
                 print('f = %.3e \t Linf = %.3e \t Tph = %.3e \t rhoph = %.3e'%(f0,Linf,T_phot,rho_phot))
-            L = Linf*Swz(Rphot)**(-1)
-            F = L/(4*np.pi*Rphot**2)
-            alpha = F/(c*arad*T_phot**4)
-            Lam = FLD_Lam(L,Rphot,T_phot)
+            x = fld.x(Linf,Rphot,T_phot,v=0)
+            Lam = fld.Lambda(Linf,Rphot,T_phot,v=0)
             if Verbose:
-                print('alpha = %.3f \t lambda = %.3f'%(alpha,Lam))
+                print('x = %.3f \t lambda = %.3f'%(x,Lam))
                 print('L/4pir^2sigT^4 = %.3f'%(F/sigmarad/T_phot**4))
                 print('\nRadius (km) \t Step # \t Iter count \t RNS error')   
         
@@ -721,7 +646,7 @@ def MakeEnvelope(Rphotkm, rend=1e9, Verbose=False, tol=1e-4, return_stuff=False)
         # When the two solutions are converging on rho and T, move the starting point inwards and reset a & b
         if conv[0] is True:
             rcheck,rhoa,rhob,Ta,Tb = conv[1:]
-            rspan = (rcheck,1.01*rg)
+            rspan = (rcheck,1.01*gr.rg)
             a,b = 0,1  
             count_iter+=1  # update step counter
             count = 0      # reset iteration counter

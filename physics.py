@@ -14,7 +14,7 @@ mp = 1.67e-24
 # might just be dummy arguments. In that case these last two arguments must be called with key=arg (kwarg)
 
 
-class EOS:
+class EquationOfState:
 
     # Ideal gas equation of state with variable radiation pressure, Pr=faT^4, where f=1/3 in optically thick regions, f=1 in optically thin.
 
@@ -113,16 +113,17 @@ class EOS:
 
 class GeneralRelativity():
 
-    def __init__(self, M, eos):
+    def __init__(self, M):
 
         self.M = M
-        self.eos = eos
         self.GM = 6.6726e-8*2e33*M
-        self.LEdd = 4*pi*c*self.GM / self.eos.kappa0
-
+        self.rg = 2*self.GM/c**2
 
     def Swz(self, r):                # Schwartzchild metric term
-        return (1-2*self.GM/c**2/r)
+        return (1-self.rg/r)
+
+    def grav(self,r):                    # local gravity
+        return self.GM/r**2 * self.Swz(r)**(-1/2)
 
     def gamma(self, v):              # Lorentz Factor
         return 1/sqrt(1-v**2/c**2)
@@ -130,8 +131,8 @@ class GeneralRelativity():
     def Y(self, r, v):                # Energy parameter
         return sqrt(self.Swz(r))*self.gamma(v)
 
-    def Lcrit(self, r, rho, T):        # Local critical luminosity
-        return self.LEdd * (self.eos.kappa0/self.eos.kappa(rho,T)) *self.Swz(r)**(-1/2)
+    def Lcrit(self, r, rho, T, eos):        # Local critical luminosity
+        return 4*pi*c*self.GM/eos.kappa(rho,T) * self.Swz(r)**(-1/2)
 
     def Lcomoving(self, Lstar, r, v):  # Comoving luminosity from Lstar (Lstar = Linf if v=0)
         return Lstar/(1+v**2/c**2)/self.Y(r, v)**2
@@ -139,6 +140,8 @@ class GeneralRelativity():
 
 
 class FluxLimitedDiffusion():
+
+    ''' Modified flux-limited diffusion of Levermore & Pomraning (1981) for GR '''
 
     def __init__(self, GR):
         self.GR = GR # GeneralRelativity class gives Lcomoving
@@ -194,9 +197,11 @@ class GradientParameters():
 
         lam,_,R = self.FLD.Lambda(Lstar,r,T,v,return_params=True)
         L = self.GR.Lcomoving(Lstar,r,v)
+        b = self.eos.Beta(rho,T, lam=lam, R=R)
 
-        return 1/self.GR.Y(r,v) * L/self.LEdd * self.eos.kappa(rho,T)/self.eos.kappa0 * self.GM/r * \
-                (1 + self.eos.Beta(rho,T, lam=lam, R=R)/(12*lam*(1-self.eos.Beta(rho,T, lam=lam, R=R))))
+        return 1/self.GR.Y(r,v) * L/self.LEdd * self.eos.kappa(rho,T)/self.eos.kappa0 * \
+                self.GM/r * (1 + b/(12*lam*b))
+
 
     def Tstar(self, Lstar, T, r, rho, v): 
 
