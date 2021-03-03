@@ -4,6 +4,8 @@ Version with flux-limited diffusion : transitions to optically thin
 '''
 
 import sys
+sys.path.append(".")
+
 import numpy as np
 from scipy.optimize import brentq,fsolve,toms748,root_scalar
 from scipy.integrate import solve_ivp,quad
@@ -557,7 +559,7 @@ def OuterBisection(rend=1e9,tol=1e-5):
     return R,T,Phi
 
 
-def MakeWind(root, logMdot, Verbose=0, IgnoreErrors = False):
+def MakeWind(root, logMdot, Verbose=0):
     ''' Obtaining the wind solution for set of parameters Edot/LEdd and logTs'''
 
     setup_globals(root,logMdot,Verbose)

@@ -2,14 +2,15 @@
 # of these wind models, with a lot of tricks to speed up the computation time. Odds of understanding
 # all the technicalities are slim, better to contact me directly :)
 
+import sys
+sys.path.append(".")
 
 import numpy as np
-import sys
 import os
 import IO
 from scipy.interpolate import InterpolatedUnivariateSpline as IUS 
 from scipy.optimize import fsolve,brentq
-from wind_GR_FLD import *
+from winds.wind_GR_FLD import *
 
 # import warnings
 # warnings.filterwarnings("ignore", category=RuntimeWarning) 
@@ -110,9 +111,6 @@ def bound_Ts_for_Edot(logMdot,Edot_LEdd,logTsa0,logTsb0,npts_Ts=10,tol=1e-5,Verb
 
     print('\nok')
     return a,b
-
-
-# bound_Ts_for_Edot(18,1.03222222,7.61,7.72)
 
 
 def get_EdotTsrel(logMdot,tol=1e-5,Verbose=0,Edotmin=1.01,Edotmax=1.04,npts=10,save_decimals=8):
@@ -234,7 +232,7 @@ def RootFinder(logMdot,checkrel=True,Verbose=False,depth=1):
         
         elif logMdot < 17.2:
             # low Mdots are hard, it's best to narrow the search using previous roots
-            logMdots,roots = IO.load_roots()
+            logMdots,roots = IO.load_wind_roots()
             elts = [i for i in range(len(logMdots)) if logMdots[i]>logMdot] # grab Mdots larger than current one
             x1,x2 = logMdots[elts[0]], logMdots[elts[1]]
             y1,y2 = roots[elts[0]][0], roots[elts[1]][0] # Edot values
@@ -346,7 +344,7 @@ def ImproveRoot(logMdot, eps=0.1, npts=5):
 
     print('\n\n ** Improving root for logMdot = %.2f ** '%logMdot)
 
-    logMdots,roots = IO.load_roots()
+    logMdots,roots = IO.load_wind_roots()
     if logMdot not in logMdots:
         sys.exit("root doesn't exist")
     root = roots[logMdots.index(logMdot)]
@@ -369,8 +367,8 @@ def ImproveRoot(logMdot, eps=0.1, npts=5):
     #get_EdotTsrel(logMdot,Edotmin=root[0]-eps,Edotmax=root[0]+eps,npts=8)
     IO.clean_EdotTsrelfile(logMdot,warning=0)
     root = RootFinder(logMdot,checkrel=False)
-    IO.save_root(logMdot,root,decimals=decimals)
-    IO.clean_rootfile(warning=0)
+    IO.save_wind_root(logMdot,root,decimals=decimals)
+    IO.clean_wind_rootfile(warning=0)
 
 
 
@@ -420,9 +418,9 @@ def driver(logmdots):
             else:
                 success.append(logMdot)
                 if logMdot<17:
-                    IO.save_root(logMdot,root,decimals=10)
+                    IO.save_wind_root(logMdot,root,decimals=10)
                 else:
-                    IO.save_root(logMdot,root)
+                    IO.save_wind_root(logMdot,root)
 
         except Exception as e:
                 problems.append(logMdot)
@@ -438,7 +436,7 @@ def driver(logmdots):
     print('There were problems for :',problems)
 
     if len(success)>=1: #and input('\nClean (overwrite) updated root file? (0 or 1) '):
-       IO.clean_rootfile(warning=0)
+       IO.clean_wind_rootfile(warning=0)
     
 
 

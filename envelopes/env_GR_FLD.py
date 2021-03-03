@@ -1,6 +1,8 @@
 ''' Main code to calculate expanded envelopes '''
 
 import sys
+sys.path.append(".")
+
 from scipy.optimize import brentq
 from scipy.integrate import solve_ivp
 from scipy.interpolate import interp1d
@@ -76,7 +78,7 @@ def photosphere(Rphot,f0):
 
 def get_f0(Rphot,Tphot,Linf): # the opposite of what photosphere does, i.e find f0 based on Linf and values at photosphere
     Lph = Linf*gr.Swz(Rphot)**(-1)
-    Lcrph = gr.Lcrit(Rphot,0,Tpho,eos)
+    Lcrph = gr.Lcrit(Rphot,0,Tphot,eos)
     return np.log10(1-Lph/Lcrph)
 
 

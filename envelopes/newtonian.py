@@ -1,11 +1,21 @@
+import sys
+sys.path.append(".")
+
 ## Paczynski and Anderson gave a simple formula for static envelopes when L\approx LEdd
-## Following their derivations but keeping x=L/LEdd a free parameter, the result depends on the hypergeometric function
+## Following their derivations but keeping x=L/LEdd a free parameter, the result depends on the hypergeometric function (see our Appendix D)
 
 from scipy.special import hyp2f1
+from scipy.optimize import fsolve
 
 # Neutron star parameters
 M = 1.4*2e33 # g
 R = 12e5 # cm
+
+# Constants
+kB = 1.380658e-16
+arad = 7.5657e-15
+c = 2.99792458e10
+mp = 1.67e-24
 
 # Opacity formula : kappa=kappa0 / (1 + (T/T0)^alpha)
 T0 = 4.5e8 # K
@@ -25,10 +35,9 @@ def rho(T,x):
 def find_Tb(x):
 
     def innerBC_error(Tb):
-        P = eos.pressure_e(rho(Tb,x), Tb)
+        P = eos.pressure(rho(Tb,x), Tb, lam=1/3, R=0)
         return P-gyb
     
-    from scipy.optimize import fsolve
     return fsolve(innerBC_error, x0=1e9)
 
 
@@ -43,7 +52,7 @@ def find_rph(x):
 
 
 
-# if x=1 exactly, we use P&A formula (otherwise divide by zero)
+# if x=1 exactly, we use P&A formula (otherwise there is division by zero)
 def find_rph_x1():
 
     Tb = find_Tb(1)

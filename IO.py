@@ -495,8 +495,10 @@ def change_param(key, new_value):
 
 def make_directories():
     ''' Make directories according to model name '''
-    for D in ('winds/','envelopes/'):
-        path = D + 'models/' + get_name()
+    
+    path1 = 'envelopes/models/' + get_name(include_Prad=False)
+    path2 = 'winds/models/' + get_name()
+    for path in (path1,path2):
         if not os.path.exists(path): 
             os.mkdir(path)
 
@@ -508,10 +510,6 @@ def export_grid(target = "."):
 
     if target[-1]!='/': target += '/'
     filename = target + 'grid_' + get_name(include_Prad=False)+'.txt'
-
-    # Need GR functions to calculate local luminosities
-    from physics import GeneralRelativity
-    gr = GeneralRelativity(load_params()['M'])
 
     with open(filename, 'w') as f:
 
@@ -591,7 +589,7 @@ def load_wind_old(logMdot, specific_file=None):
 
     # Calculate Edot
     import physics
-    LEdd = 4*np.pi*c*6.6726e-8*2e33*load_params()['M'] / physics.EOS(load_params()['comp'])
+    LEdd = 4*np.pi*c*6.6726e-8*2e33*load_params()['M'] / physics.EquationOfState(load_params()['comp'])
     Edot = load_wind_roots(logMdot)[0]*LEdd + 10**logMdot*c**2
 
     # Return as wind tuple object

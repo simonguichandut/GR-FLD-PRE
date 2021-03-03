@@ -1,7 +1,13 @@
 *__pycache__*
 *.DS_Store*
 
+# scripts
 temp.py
 run.py
 
+# models
+*Ni_M*
+
+# other files
 grid*
+
