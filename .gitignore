@@ -11,3 +11,5 @@ run.py
 # other files
 grid*
 
+paper_plots.py
+paper_plots/

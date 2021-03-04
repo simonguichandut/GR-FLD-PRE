@@ -73,7 +73,7 @@ def solve_energy(r,v,T):
         Lstar1 = Edot - Mdot*eos.H(rho, T, lam=1/3, R=0)*gr.Y(r, v)   # optically thick
         Lstar2 = Edot - Mdot*eos.H(rho, T, lam=1e-10, R=1e10)*gr.Y(r, v)  # optically thin
         def energy_error(Lstar):
-            Lam,_,R = fld.Lambda(Lstar,r,T,v,return_params=True)
+            Lam,R = fld.Lambda(Lstar,r,T,v)
             return Edot - Mdot*eos.H(rho, T, Lam, R)*gr.Y(r, v) - Lstar
 
         Lstar = brentq(energy_error, Lstar1, Lstar2, xtol=1e-6, rtol=1e-8) #brentq is fastest
@@ -162,7 +162,7 @@ def calculateVars_phi(r, T, phi, subsonic=False, return_all=False):
     if not return_all:
         return u, rho, phi, Lstar
     else:
-        lam,_,R = fld.Lambda(Lstar,r,T,u,return_params=True)
+        lam,R = fld.Lambda(Lstar,r,T,u)
         P = eos.pressure(rho, T, lam=lam, R=R)
         L = gr.Lcomoving(Lstar,r,u)
         cs = np.sqrt(eos.cs2(T))
@@ -182,7 +182,7 @@ def calculateVars_rho(r, T, rho, return_all=False):
         return u, rho, Lstar
     else:
 
-        lam,_,R = fld.Lambda(Lstar,r,T,u,return_params=True)
+        lam,R = fld.Lambda(Lstar,r,T,u)
 
         mach = u/np.sqrt(F.B(T))
         phi = np.sqrt(F.A(T))*mach + 1/(np.sqrt(F.A(T))*mach)
@@ -195,14 +195,13 @@ def calculateVars_rho(r, T, rho, return_all=False):
    
 
 def dr(r, y, subsonic):
-
-    ''' Calculates the derivatives of T and phi by r '''
+    ''' Derivatives of T and phi by r '''
 
     T, phi = y[:2]
     u, rho, phi, Lstar = calculateVars_phi(r, T, phi=phi, subsonic=subsonic)
 
-    Lam = fld.Lambda(Lstar,r,T,u)
-    dlnT_dlnr = -F.Tstar(Lstar, T, r, rho, u) / (3*Lam) - 1/gr.Swz(r) * GM/c**2/r  
+    Lam,_ = fld.Lambda(Lstar,r,T,u)
+    dlnT_dlnr = -F.Tstar(Lstar, T, r, rho, u) - GM/c**2/r/gr.Swz(r)
     # remove small dv_dr term which has numerical problems near sonic point
     dT_dr = T/r * dlnT_dlnr
 
@@ -217,8 +216,7 @@ def dr_wrapper_supersonic(r,y): return dr(r,y,subsonic=False)
 def dr_wrapper_subsonic(r,y):   return dr(r,y,subsonic=True)
 
 def drho(rho, y):
-    ''' Calculates the derivatives of T and r with by rho
-        Considering degenerate electrons '''
+    ''' Derivatives of T and r by rho '''
 
     T, r = y[:2]
     u, rho, Lstar = calculateVars_rho(r, T, rho = rho)
@@ -369,12 +367,6 @@ def innerIntegration_rho(rho95, T95, returnResult=False):
 
 
 # -------------------------------- Wind --------------------------------------
-
-# A named tuple allows us to access arrays by their variable name, 
-# while also being able to tuple unpack to get everything
-
-Wind = namedtuple('Wind',
-            ['rs','rph','Edot','r','T','rho','u','Lstar'])  
 
 def setup_globals(root,logMdot,Verbose=False,return_them=False):
     global Mdot, Edot, Ts, rs, verbose
@@ -627,7 +619,7 @@ def MakeWind(root, logMdot, Verbose=0):
     x = F/(arad*c*T**4)
     rph = r[np.argmin(abs(x - 0.25))]
 
-    return Wind(rs, rph, Edot, r, T, rho, u, Lstar)
+    return IO.Wind(rs, rph, Edot, r, T, rho, u, Lstar)
  
 
 # # For testing when making modifications to this script

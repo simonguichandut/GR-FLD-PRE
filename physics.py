@@ -155,7 +155,7 @@ class FluxLimitedDiffusion():
         return x
 
 
-    def Lambda(self, Lstar, r, T, v, return_params=False):
+    def Lambda(self, Lstar, r, T, v):
 
         x = self.x(Lstar,r,T,v)
 
@@ -170,10 +170,7 @@ class FluxLimitedDiffusion():
         Lam = 1/12 * ( (2-3*x) + sqrt(-15*x**2 + 12*x + 4) )  # 1/3 thick , 0 thin
         R = x/Lam # 0 thick, 1/lam->inf thin
 
-        if return_params:
-            return Lam,x,R
-        else:
-            return Lam
+        return Lam,R
 
 
 class GradientParameters():
@@ -195,17 +192,17 @@ class GradientParameters():
 
     def C(self, Lstar, T, r, rho, v):  
 
-        lam,_,R = self.FLD.Lambda(Lstar,r,T,v,return_params=True)
+        lam,R = self.FLD.Lambda(Lstar,r,T,v)
         L = self.GR.Lcomoving(Lstar,r,v)
         b = self.eos.Beta(rho,T, lam=lam, R=R)
 
         return 1/self.GR.Y(r,v) * L/self.LEdd * self.eos.kappa(rho,T)/self.eos.kappa0 * \
-                self.GM/r * (1 + b/(12*lam*b))
+                self.GM/r * (1 + b/(12*lam*(1-b)))
 
 
     def Tstar(self, Lstar, T, r, rho, v): 
 
-        lam,_,_ = self.FLD.Lambda(Lstar,r,T,v,return_params=True)
+        lam,R = self.FLD.Lambda(Lstar,r,T,v)
         L = self.GR.Lcomoving(Lstar,r,v)
 
         return 1/(self.GR.Y(r,v)*lam) * L/self.LEdd * self.eos.kappa(rho,T)/self.eos.kappa0 \

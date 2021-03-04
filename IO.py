@@ -63,6 +63,13 @@ def get_envelope_list():
     sorted_list_clean = [int(x) if str(x)[-1]=='0' else x for x in sorted_list] # changes 15.0 to 15 for filename cleanliness
     return sorted_list_clean
 
+
+# We used named tuple objects to store solutions. They allow us to access arrays by their variable name, 
+# while also being able to tuple unpack to get everything in the usual python way.
+from collections import namedtuple
+Wind = namedtuple('Wind', ['rs','rph','Edot','r','T','rho','u','Lstar'])  
+Env = namedtuple('Env', ['rph','Linf','r','T','rho'])
+
     
 #------------------------------------ Winds ------------------------------------
 
@@ -210,9 +217,7 @@ def load_wind(logMdot, specific_file=None):
 
     r,rho,T,u,Lstar = np.array(varz)
 
-
-    # Return as wind tuple object
-    from winds.wind_GR_FLD import Wind
+    # Return as Wind named tuple object
     return Wind(rs, rph, Edot, r, T, rho, u, Lstar)
 
 
@@ -372,7 +377,7 @@ def load_envelope(Rphotkm, specific_file=None):
 
     r,rho,T = np.array((r,rho,T))
 
-    from envelopes.env_GR_FLD import Env
+    # return as Env named tuple object
     return Env(Rphotkm*1e5,Linf,r,T,rho)
 
 
@@ -457,7 +462,7 @@ def append_vars(line,varz):
     for col,var in enumerate(varz):
         var.append(float(l[col]))
 
-def change_param(key, new_value):
+def change_param(key, new_value, print_update=True):
 
     old_value = load_params()[key]
 
@@ -488,7 +493,8 @@ def change_param(key, new_value):
             else:
                 new_file_contents += line
 
-    print(new_file_contents)
+    if print_update:
+        print(new_file_contents)
 
     with open('./params.txt','w') as f:
         f.write(new_file_contents)
@@ -514,18 +520,18 @@ def export_grid(target = "."):
     with open(filename, 'w') as f:
 
         # Header
-        f.write(('{:<10s}    '*7 +'{:<10s}\n').format(
-        'Lbinf (erg/s)','Mdot (g/s)','Edot (g/s)','rs (cm)','rph (cm)','rhob (g/cm3)','Tb (K)','Teff (K)'))
+        f.write(('{:<10s}    '*8 +'{:<10s}\n').format(
+        'Lbinf (erg/s)','Lphinf (erg/s)','Mdot (g/s)','Edot (erg/s)','rs (cm)','rph (cm)','rhob (g/cm3)','Tb (K)','Teff (K)'))
 
         # Envelopes
         for Rphotkm in get_envelope_list():
             env = load_envelope(Rphotkm)
 
-            # Base luminosity
-            f.write('%0.4e       ' % env.Linf)
+            # Base and photospheric luminosity
+            f.write('%0.4e       %0.4e        ' % (env.Linf,env.Linf))
 
             # Mdot,Edot
-            f.write('0' + ' '*13 + '%0.4e    '%env.Linf)
+            f.write('0' + ' '*13 + '%0.4e   L   '%env.Linf)
 
             # rs,rph
             f.write('0' + ' '*13 + '%0.4e    ' % env.rph)
@@ -540,11 +546,13 @@ def export_grid(target = "."):
         for logMdot in get_wind_list():
             w = load_wind(logMdot)
 
-            # Base luminosity
-            f.write('%0.4e       ' % w.Lstar[0])
+            iphot = list(w.r).index(w.rph)
+
+            # Base and photospheric luminosity
+            f.write('%0.4e       %0.4e        ' % (w.Lstar[0],w.Lstar[iphot]))
 
             # Mdot,Edot
-            f.write('%0.4e    %.4e    '%(10**logMdot,w.Edot))
+            f.write('%0.4e    %.4e      '%(10**logMdot,w.Edot))
 
             # rs,rph
             f.write('%0.4e    %.4e    '%(w.rs,w.rph))
@@ -553,7 +561,7 @@ def export_grid(target = "."):
             f.write('%0.4e      %0.4e    '%(w.rho[0],w.T[0]))
 
             # Teff (T(rph))
-            f.write('%0.4e\n'%w.T[list(w.r).index(w.rph)])
+            f.write('%0.4e\n'%w.T[iphot])
 
             
 
@@ -593,5 +601,4 @@ def load_wind_old(logMdot, specific_file=None):
     Edot = load_wind_roots(logMdot)[0]*LEdd + 10**logMdot*c**2
 
     # Return as wind tuple object
-    from winds.wind_GR_FLD import Wind
     return Wind(rs, rph, Edot, r, T, rho, u, Lstar)

@@ -6,7 +6,6 @@ sys.path.append(".")
 from scipy.optimize import brentq
 from scipy.integrate import solve_ivp
 from scipy.interpolate import interp1d
-from collections import namedtuple
 import numpy as np
 import IO
 import physics
@@ -94,7 +93,7 @@ def derivs(r,y,Linf):
 
     Lam = fld.Lambda(Linf,r,T,v=0)
 
-    dlnT_dlnr = -F.Tstar(Linf, T, r, rho, v=0) / (3*Lam) - 1/gr.Swz(r) * GM/c**2/r
+    dlnT_dlnr = -F.Tstar(Linf, T, r, rho, v=0) - GM/c**2/r/gr.Swz(r)
     dlnrho_dlnr = (-GM/gr.Swz(r)/r * F.A(T) + F.C(Linf,T,r,rho,v=0))/F.B(T)
 
     dT_dr = T/r * dlnT_dlnr
@@ -102,25 +101,9 @@ def derivs(r,y,Linf):
 
     return [drho_dr,dT_dr]
 
-# --------------------------------------- Optically thin limit ---------------------------------------
-
+# Optically thin limit is analytical
 def T_thin(Linf,r):
     return ( gr.Lcomoving(Linf,r,v=0) / (4*np.pi*r**2*arad*c) )**0.25
-
-def drho_thin(r,rho,Linf):
-
-    L = gr.Lcomoving(Linf,r,v=0)
-    T = T_thin(Linf,r)
-
-    Flux = L/(4*np.pi*r**2)
-    alpha = Flux/(c*arad*T**4)  
-
-    Lam = eos.kappa0*rho*r/2/gr.Y(r,v=0)  # optically thin limit of lambda (it's not exactly zero)
-    b = eos.Beta(rho,T, lam=Lam, R=alpha/Lam)
-    C =  1/gr.Y(r,v=0) * L/LEdd * eos.kappa(rho,T)/eos.kappa0 * GM/r * (1 + b/(12*Lam*(1-b)))
-
-    dlnrho_dlnr = (-GM/gr.Swz(r)/r * F.A(T) + C)/F.B(T)
-    return rho/r * dlnrho_dlnr
     
 # ---------------------------------------------- Integration -----------------------------------------------
 
@@ -189,29 +172,7 @@ def Shoot_out(rspan, rho0, T0, Linf, rtol=1e-6, max_step=1e5):
 
     return sol
 
-def Shoot_out_thin(rvec, rho0, Linf, rtol=1e-6, rho_min=1e-10):
-    ''' Integrates out using r as the independent variable, using the optically thin 
-        limit to calculate the temperature '''
-
-    def hit_minimum_density(r,y,*args):
-        return y[0]-rho_min      
-    hit_minimum_density.terminal = True
-
-    T = ( Linf*gr.Swz(rvec)**(-1) / (4*np.pi*rvec**2*arad*c) )**0.25
-    sol = solve_ivp(drho_thin, t_span=(rvec[0],rvec[-1]), y0=(rho0,), args=(Linf,), 
-            events = (hit_minimum_density), method='Radau', dense_output=True, 
-            rtol=rtol)
-    rho = sol.sol(rvec)[0]
-
-    print('density zero at r=%.4f km'%(sol.t[-1]/1e5))
-
-    return rho,T
-
-
 # ------------------------------------------------- Envelope ---------------------------------------------------
-
-Env = namedtuple('Env',
-            ['rph','Linf','r','T','rho'])
 
 def get_rhophf0rel(Rphotkm, rend=1e9, tol=1e-6, Verbose=0, f0min=-4.5, f0max=-3.7, npts=40, spacing='linear'):
 
@@ -458,12 +419,8 @@ def OuterBisection(Rphotkm, rho0, T0, Linf, rend=1e9, Verbose=False, tol=1e-4, r
                 if abs(Tx-T_thin(Linf,rx))/T_thin(Linf,rx) < 1e-3:
                     if Verbose: print('Reached optically thin limit at r=%.4f km'%(rx/1e5))
                 
-                    # rho3,T3 = Shoot_out_thin(R2[len(rho2)-1:], rho0, Linf)
-                    # stuff.append([R2[len(rho2)-1:],rho3,T3])
-                    # rho2,T2 = np.append(rho2, rho3[1:]) , np.append(T2, T3[1:])
-
                     # Append optically thin limit: T \propto r^-1/2, rho\approx 0
-                    # Rthin = R[len(rho)-1:]
+   
                     Rthin = np.logspace(np.log10(rx), np.log10(rend), 50) # don't need many points if it's analytical
                     rhothin = 1e-20 * np.ones(len(Rthin))
                     Tthin = T_thin(Linf,Rthin)
@@ -683,10 +640,10 @@ def MakeEnvelope(Rphotkm, rend=1e9, Verbose=False, tol=1e-4, return_stuff=False)
         r2,rho2,T2,stuff2 = OuterBisection(Rphotkm, rho0=rho[-1], T0=T[-1], Linf=Linf, rend=rend, Verbose=Verbose, return_stuff=True)
         r,rho,T = np.append(r,r2[1:]), np.append(rho,rho2[1:]), np.append(T,T2[1:])
         stuff.extend(stuff2)
-        return Env(Rphot,Linf,r,T,rho),stuff
+        return IO.Env(Rphot,Linf,r,T,rho),stuff
     
     else:
         r2,rho2,T2 = OuterBisection(Rphotkm, rho0=rho[-1], T0=T[-1], Linf=Linf, rend=rend, Verbose=Verbose, return_stuff=False)
         r,rho,T = np.append(r,r2[1:]), np.append(rho,rho2[1:]), np.append(T, T2[1:])
-        return Env(Rphot,Linf,r,T,rho)
+        return IO.Env(Rphot,Linf,r,T,rho)
 

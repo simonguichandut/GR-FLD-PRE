@@ -26,7 +26,7 @@ IO.py contains all the scripts for reading and writing. If you are not trying to
     print(wind.Edot, wind.rs, wind.rph)
 
 ## Grid of models
-Use `IO.export_grid(dir)`, where dir is the target directory (default "./"). Produces a table with values for Lbase at infinity, Mdot, Edot, rs, rph, rho_base, T_base, Teff. For envelopes, Mdot=0, Edot=Linf and rs=0.
+Use `IO.export_grid(dir)`, where dir is the target directory (default "./"). Produces a table with values for Lbase & Lphot at infinity, Mdot, Edot, rs, rph, rho_base, T_base, Teff. For envelopes, Mdot=0, Edot=Linf (same everywhere) and rs=0.
 
 
 
