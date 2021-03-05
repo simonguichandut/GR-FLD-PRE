@@ -119,7 +119,7 @@ class GeneralRelativity():
         self.GM = 6.6726e-8*2e33*M
         self.rg = 2*self.GM/c**2
 
-    def Swz(self, r):                # Schwartzchild metric term
+    def Swz(self, r):                # Schwarzschild metric term
         return (1-self.rg/r)
 
     def grav(self,r):                    # local gravity
@@ -202,7 +202,7 @@ class GradientParameters():
 
     def Tstar(self, Lstar, T, r, rho, v): 
 
-        lam,R = self.FLD.Lambda(Lstar,r,T,v)
+        lam,_ = self.FLD.Lambda(Lstar,r,T,v)
         L = self.GR.Lcomoving(Lstar,r,v)
 
         return 1/(self.GR.Y(r,v)*lam) * L/self.LEdd * self.eos.kappa(rho,T)/self.eos.kappa0 \

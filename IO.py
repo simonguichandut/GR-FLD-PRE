@@ -76,7 +76,7 @@ Env = namedtuple('Env', ['rph','Linf','r','T','rho'])
 def save_wind_root(logMdot,root,decimals=8):
 
     filename = get_name()
-    path = 'roots/roots_' + filename + '.txt'
+    path = 'winds/roots/roots_' + filename + '.txt'
 
     if not os.path.exists(path):
         f = open(path,'w+')
@@ -149,7 +149,7 @@ def clean_wind_rootfile(warning=1):
             o = 1
         if o:
             filename = get_name()
-            path = 'roots/roots_' + filename + '.txt'
+            path = 'winds/roots/roots_' + filename + '.txt'
             os.remove(path)
 
             for x,y in zip(new_logMdots,new_roots): 
@@ -597,7 +597,7 @@ def load_wind_old(logMdot, specific_file=None):
 
     # Calculate Edot
     import physics
-    LEdd = 4*np.pi*c*6.6726e-8*2e33*load_params()['M'] / physics.EquationOfState(load_params()['comp'])
+    LEdd = 4*np.pi*c*6.6726e-8*2e33*load_params()['M'] / physics.EquationOfState(load_params()['comp']).kappa0
     Edot = load_wind_roots(logMdot)[0]*LEdd + 10**logMdot*c**2
 
     # Return as wind tuple object

@@ -37,7 +37,7 @@ def run_outer(logMdot,Edot_LEdd,logTs,Verbose=0):  # full outer solution from so
 def run_inner(logMdot,Edot_LEdd,logTs,Verbose=0,solution=False):  # full inner solution from sonic point
     global Mdot,Edot,Ts,verbose,rs
     Mdot, Edot, Ts, rs, verbose = setup_globals([Edot_LEdd,logTs],logMdot,Verbose=Verbose,return_them=True)
-    sol_inner1 = innerIntegration_r()
+    sol_inner1 = innerIntegration_r(rs,Ts)
     T95,phi95 = sol_inner1.sol(0.95*rs)
     _,rho95,_,_ = calculateVars_phi(0.95*rs, T95, phi=phi95, subsonic=True)
 
@@ -181,13 +181,18 @@ def Check_EdotTsrel(logMdot, recalculate=True):
     print('\n Checking EdotTs rel for %d Edot values'%len(Edotvals))
 
     for i in range(len(Edotvals)):
-        sola,_ = run_outer(logMdot,Edotvals[i],TsvalsA[i])
-        solb,_ = run_outer(logMdot,Edotvals[i],TsvalsB[i])
+
+        # There can be rounding errors here, so we check TsA rounded down, TsB rounded up
+        decimals = len(str(TsvalsA[i])) - 2 
+        TsA = TsvalsA[i] - 10**(-decimals)
+        TsB = TsvalsB[i] + 10**(-decimals)
+        sola,_ = run_outer(logMdot,Edotvals[i],TsA)
+        solb,_ = run_outer(logMdot,Edotvals[i],TsB)
 
         if sola.status == 1 and solb.status == -1:
-            print('\nEdotTsrel file at Edot/LEdd=%.3f is OK!'%(Edotvals[i]))
+            print('\nEdotTsrel file at Edot/LEdd=%.6f is OK!'%(Edotvals[i]))
         else:
-            print('\nEdotTsrel file at Edot/LEdd=%.3f needs fixing'%(Edotvals[i]))
+            print('\nEdotTsrel file at Edot/LEdd=%.6f needs fixing'%(Edotvals[i]))
 
             if recalculate is True:
 
@@ -400,7 +405,7 @@ def recursor(logMdot, depth=1, max_depth=5):
 def driver(logmdots):
 
     if logmdots == 'all':
-        logmdots = np.round(np.arange(19,17,-0.1),decimals=1)
+        logmdots = IO.get_wind_list()[::-1]
 
     elif type(logmdots) == float or type(logmdots) == int:
         logmdots = [logmdots]

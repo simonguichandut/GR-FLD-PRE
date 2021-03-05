@@ -275,7 +275,7 @@ def outerIntegration(r0, T0, phi0, rmax=1e10):
         print('FLD outer integration : ',sol.message, ('rmax = %.3e'%sol.t[-1]))
     return sol
 
-def innerIntegration_r():
+def innerIntegration_r(rs, Ts):
     ''' Integrates in from the sonic point to 95% of the sonic point, 
         using r as the independent variable '''
     
@@ -284,8 +284,11 @@ def innerIntegration_r():
 
     inic = [Ts, 2.0]
 
-    sol = solve_ivp(dr_wrapper_subsonic, (rs,0.95*rs), inic, method='RK45',
-                    atol=1e-6, rtol=1e-6, dense_output=True)   
+    # sol = solve_ivp(dr_wrapper_subsonic, (rs,0.95*rs), inic, method='RK45',
+    #                 atol=1e-6, rtol=1e-6, dense_output=True)   
+
+    sol = solve_ivp(dr_wrapper_subsonic, (rs,0.95*rs), inic, method='Radau',
+                atol=1e-6, rtol=1e-10, dense_output=True, first_step=1e3, max_step=1e4)   
 
     if verbose: print(sol.message)
 
@@ -399,7 +402,7 @@ def OuterBisection(rend=1e9,tol=1e-5):
 
     if verbose: print('Finding second solution')
     # step = 1e-6 if np.log10(Mdot)>=17 else 1e-8
-    step = 1e-6
+    step = 5e-6
     Tsb,rsb,solb = Tsa,rsa,sola
     i=0
     while solb.status == sola.status:
@@ -420,9 +423,16 @@ def OuterBisection(rend=1e9,tol=1e-5):
             print('Not able to find a solution that diverges in opposite \
                     direction after changing Ts by 20 tolerances.  \
                     Problem in the TsEdot interpolation')
-            raise Exception('Improve root')
+            raise Exception('Should run ImproveRoot')
             # break
-            
+
+    # we want sola to be the one that reaches dv/dr=0, so have the smaller Ts
+    if sola.status == -1:
+        print('switching sola and solb')
+        Tsc,rsc,solc = Tsb,rsb,solb
+        Tsb,rsb,solb = Tsa,rsa,sola
+        Tsa,rsa,sola = Tsc,rsc,solc
+
     if verbose:
         print('Two initial solutions. sonic point values:')
         print('logTs - sola:%.6f \t solb:%.6f'%(np.log10(Tsa),np.log10(Tsb)))
@@ -551,72 +561,92 @@ def OuterBisection(rend=1e9,tol=1e-5):
     return R,T,Phi
 
 
-def MakeWind(root, logMdot, Verbose=0):
-    ''' Obtaining the wind solution for set of parameters Edot/LEdd and logTs'''
+def MakeWind(root, logMdot, Verbose=0, outer_only=(False,), inner_only=(False,)):
+    ''' Obtaining the wind solution for set of parameters Edot/LEdd and logTs.
+        If recalculating outer or inner solution, provide the initial Wind
+        named tuple object in either argument (e.g. outer_only=(True,wind)) '''
 
-    setup_globals(root,logMdot,Verbose)
+    Mdot, Edot, Ts, rs, verbose = setup_globals(root,logMdot,Verbose,return_them=True)
 
     if verbose: 
         print('\nMaking a wind for logMdot=%.2f, logTs=%.5f, (Edot-Mdotc2)/Ledd=%.5f'
                 %(logMdot,np.log10(Ts),(Edot-Mdot*c**2)/LEdd))
 
-    # Start by finding the sonic point
+    # Start by finding the sonic point (it will change a bit in the first step of the bisection)
     rs = rSonic(Ts)
     
     if verbose:
         print('For log10Ts = %.2f, located sonic point at log10r = %.2f' %
               (np.log10(Ts), np.log10(rs)))
 
-    # Outer integration
-    r_outer,T_outer, phi_outer = OuterBisection()
-    _,rho_outer,_,_ = calculateVars_phi(r_outer, T_outer, phi=phi_outer, 
-                        subsonic=False)
 
-    # Sonic point changes slightly in the bisection process
-    Tsnew,rsnew = T_outer[0], r_outer[0]
-    print('Change in sonic point (caused by error in Edot-Ts relation interpolation)')
-    print('root:\t Ts = %.5e \t rs = %.5e'%(Ts,rs))
-    print('new:\t  Ts = %.5e \t rs = %.5e'%(Tsnew,rsnew))
-    print('Judge if this is a problem or not')
-    rs = rsnew
+    ## Outer integration
+    if not inner_only[0]:
+       
+        r_outer,T_outer, phi_outer = OuterBisection()
+        _,rho_outer,_,_ = calculateVars_phi(r_outer, T_outer, phi=phi_outer, 
+                            subsonic=False)
 
-    # First inner integration
-    r95 = 0.95*rs
-    # r_inner1 = np.linspace(rs, r95, 500)
-    r_inner1 = np.linspace(0.99*rs, r95, 30) # ignore data in 1% around rs
-    result_inner1 = innerIntegration_r()
-    T95, _ = result_inner1.sol(r95)
-    T_inner1, phi_inner1 = result_inner1.sol(r_inner1)
+        # Sonic point changes slightly in the bisection process
+        Tsnew,rsnew = T_outer[0], r_outer[0]
+        print('Change in sonic point (caused by error in Edot-Ts relation interpolation)')
+        print('root:\t Ts = %.5e \t rs = %.5e'%(Ts,rs))
+        print('new:\t  Ts = %.5e \t rs = %.5e'%(Tsnew,rsnew))
+        print('Judge if this is a problem or not')
+        rs,Ts = rsnew,Tsnew
 
-    _,rho_inner1,_,_ = calculateVars_phi(r_inner1, T_inner1, phi=phi_inner1, 
-                            subsonic=True)
-    rho95 = rho_inner1[-1]
+    else:
+        wind = inner_only[1]
+        rs = wind.rs
+        isonic = list(wind.r).index(wind.rs)
+        Ts = wind.T[isonic]
+        r_outer,T_outer,rho_outer = wind.r[isonic:],wind.T[isonic:],wind.rho[isonic:]
 
-    # Second inner integration 
-    result_inner2 = innerIntegration_rho(rho95, T95, returnResult=True)
-    rho_inner2 = np.logspace(np.log10(rho95) , np.log10(result_inner2.t[-1]), 2000)
-    T_inner2, r_inner2 = result_inner2.sol(rho_inner2)
+    ## Inner integration
+    if not outer_only[0]:
+
+        # First inner integration
+        r95 = 0.95*rs
+        # r_inner1 = np.linspace(rs, r95, 500)
+        r_inner1 = np.linspace(0.999*rs, r95, 30) # ignore data in 0.1% around rs
+        result_inner1 = innerIntegration_r(rs,Ts)
+        T95, _ = result_inner1.sol(r95)
+        T_inner1, phi_inner1 = result_inner1.sol(r_inner1)
+
+        _,rho_inner1,_,_ = calculateVars_phi(r_inner1, T_inner1, phi=phi_inner1, 
+                                subsonic=True)
+        rho95 = rho_inner1[-1]
+
+        # Second inner integration 
+        result_inner2 = innerIntegration_rho(rho95, T95, returnResult=True)
+        rho_inner2 = np.logspace(np.log10(rho95) , np.log10(result_inner2.t[-1]), 2000)
+        T_inner2, r_inner2 = result_inner2.sol(rho_inner2)
+        
+
+        # Attaching arrays for r,rho,T from surface to photosphere  
+        #  (ignoring first point in inner2 because duplicate values at r=r95)
+        r_inner = np.append(np.flip(r_inner2[1:], axis=0),
+                            np.flip(r_inner1, axis=0))
+        T_inner = np.append(np.flip(T_inner2[1:], axis=0),
+                            np.flip(T_inner1, axis=0))
+        rho_inner = np.append(np.flip(rho_inner2[1:], axis=0),
+                            np.flip(rho_inner1, axis=0))
     
+    else:
+        wind = outer_only[1]
+        isonic = list(wind.r).index(wind.rs)
+        r_inner,T_inner,rho_inner = wind.r[:isonic-1],wind.T[:isonic-1],wind.rho[isonic-1]
 
-    # Attaching arrays for r,rho,T from surface to photosphere  
-    #  (ignoring first point in inner2 because duplicate values at r=r95)
-    r_inner = np.append(np.flip(r_inner2[1:], axis=0),
-                        np.flip(r_inner1, axis=0))
-    T_inner = np.append(np.flip(T_inner2[1:], axis=0),
-                        np.flip(T_inner1, axis=0))
-    rho_inner = np.append(np.flip(rho_inner2[1:], axis=0),
-                        np.flip(rho_inner1, axis=0))
 
     r = np.append(r_inner, r_outer)
     T = np.append(T_inner, T_outer)
     rho = np.append(rho_inner, rho_outer)
 
     # Calculate the rest of the vars
-    u, rho, phi, Lstar, L, P, cs, taus, lam = calculateVars_rho(r, T, rho=rho, return_all=True)
+    u, rho, Lstar = calculateVars_rho(r, T, rho=rho)
 
     # Locate photosphere
-    F = L/(4*np.pi*r**2)
-    x = F/(arad*c*T**4)
+    x = fld.x(Lstar,r,T,u)
     rph = r[np.argmin(abs(x - 0.25))]
 
     return IO.Wind(rs, rph, Edot, r, T, rho, u, Lstar)
@@ -624,5 +654,28 @@ def MakeWind(root, logMdot, Verbose=0):
 
 # # For testing when making modifications to this script
 
-# x,z = IO.load_roots()
-# W = MakeWind(z[3],x[3], mode='wind', Verbose=True)
+# x,z = IO.load_wind_roots()
+# W = MakeWind(z[0],x[0], Verbose=True)
+
+
+# # Temporary
+# logMdot = 17.25
+# w = IO.load_wind(logMdot)
+# root = IO.load_wind_roots(logMdot)
+# setup_globals(root,logMdot)
+
+# # Update rs,Ts so it matches outer solution
+# rs,Ts = w.rs,w.T[list(w.r).index(w.rs)]
+
+# print(rs/w.rs)
+# print(Ts/w.T[list(w.r).index(w.rs)])
+
+# sol = innerIntegration_r(rs,Ts)
+# r_inner1 = np.linspace(0.999*rs, 0.95*rs, 30)
+# T_inner1, phi_inner1 = sol.sol(r_inner1)
+# _,rho_inner1,_,_ = calculateVars_phi(r_inner1, T_inner1, phi=phi_inner1, subsonic=True)
+
+# import matplotlib.pyplot as plt
+# plt.loglog(w.r,w.T,'b.')
+# plt.loglog(r_inner1,T_inner1,'r.')
+# plt.show()
