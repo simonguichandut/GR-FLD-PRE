@@ -406,7 +406,8 @@ def OuterBisection(rend=1e9,tol=1e-5):
 
     if verbose: print('Finding second solution')
     # step = 1e-6 if np.log10(Mdot)>=17 else 1e-8
-    step = 5e-6
+    # step = 5e-6
+    step=1e-8 # might need to switch to this at lowest end of Mdot (did that for the logMdot 16.8 model)
     Tsb,rsb,solb = Tsa,rsa,sola
     i=0
     while solb.status == sola.status:
@@ -431,8 +432,10 @@ def OuterBisection(rend=1e9,tol=1e-5):
             # break
 
 
-    # if sola was the high Ts one, switch sola and solb (just because convenient)
+    # if sola was the high Ts (low rs, diverging) one, switch sola and solb, so that
+    # sola is the one that goes to dv/dr=0
     if direction == -1:
+        print('switching sola and solb')
         (rsa,Tsa,sola),(rsb,Tsb,solb) = (rsb,Tsb,solb),(rsa,Tsa,sola)
 
     if verbose:
@@ -629,9 +632,17 @@ def MakeWind(root, logMdot, Verbose=0, outer_only=(False,), inner_only=(False,))
         rho_inner2 = np.logspace(np.log10(rho95) , np.log10(result_inner2.t[-1]), 2000)
         T_inner2, r_inner2 = result_inner2.sol(rho_inner2)
         
-        print('Found base at r = %.2f km' % (r_inner2[-1]/1e5))
-        rhob,Tb = rho_inner2[-1], T_inner2[-1]
+        rb,rhob,Tb = r_inner2[-1]/1e5, rho_inner2[-1], T_inner2[-1]
+        print('Found base at r = %.2f km'%rb)
         print('y=P/g= %.3e g/cm2\n'%(eos.pressure(rhob,Tb,1/3,0)/gr.grav(RNS*1e5)))
+        if abs(rb-RNS)/RNS>1:
+            print('Landed quite far away from the NS radius. This can be because there\
+                    are not enough points in the EdotTs interp, so that we need to significantly\
+                    move away from the initial root to find solutions that integrate to infinity.\
+                    Then the new root does not integrate to the NS radius anymore. Can fix this by\
+                    running ImproveRoot() in RootFinding.py.  At very low Mdot, it might help to\
+                    keep all the decimals on the root and run with that, instead of loading from\
+                    the root textfile, which has a limited number of decimals.')
 
 
         # Attaching arrays for r,rho,T from surface to photosphere  
@@ -667,26 +678,3 @@ def MakeWind(root, logMdot, Verbose=0, outer_only=(False,), inner_only=(False,))
 
 # x,z = IO.load_wind_roots()
 # W = MakeWind(z[0],x[0], Verbose=True)
-
-
-# # Temporary
-# logMdot = 17.25
-# w = IO.load_wind(logMdot)
-# root = IO.load_wind_roots(logMdot)
-# setup_globals(root,logMdot)
-
-# # Update rs,Ts so it matches outer solution
-# rs,Ts = w.rs,w.T[list(w.r).index(w.rs)]
-
-# print(rs/w.rs)
-# print(Ts/w.T[list(w.r).index(w.rs)])
-
-# sol = innerIntegration_r(rs,Ts)
-# r_inner1 = np.linspace(0.999*rs, 0.95*rs, 30)
-# T_inner1, phi_inner1 = sol.sol(r_inner1)
-# _,rho_inner1,_,_ = calculateVars_phi(r_inner1, T_inner1, phi=phi_inner1, subsonic=True)
-
-# import matplotlib.pyplot as plt
-# plt.loglog(w.r,w.T,'b.')
-# plt.loglog(r_inner1,T_inner1,'r.')
-# plt.show()

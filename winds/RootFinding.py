@@ -294,7 +294,7 @@ def RootFinder(logMdot,checkrel=True,Verbose=False,depth=1):
             sola,_ = run_outer(logMdot,Edotvals[i],TsvalsA[i])
             solb,_ = run_outer(logMdot,Edotvals[i],TsvalsB[i])
             if sola.status == solb.status:
-                print('Problem with EdotTsrel file at Edot/LEdd=%.3f ,logTs=%.3f'%(Edotvals[i],TsvalsA[i]))
+                print('Problem with EdotTsrel file at Edot/LEdd=%.8f ,logTs=%.8f'%(Edotvals[i],TsvalsA[i]))
                 print(sola.message)
                 print(solb.message)
 
