@@ -105,7 +105,7 @@ if __name__ == '__main__':
                 run_envelopes(l)
 
         elif sys.argv[1] == 'wind':
-            if min(l)<17 or max(l)>19:
+            if min(l)<16 or max(l)>19:
                 sys.exit(err_messages[3])
             else:
                 run_wind(l)

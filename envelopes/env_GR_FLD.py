@@ -41,9 +41,7 @@ LEdd = F.LEdd
 # Base boundary condition
 M,RNS,yb = params['M'],params['R'],params['yb']
 GM = 6.6726e-8*2e33*M
-ZZ = (1-2*GM/(c**2*RNS*1e5))**(-1/2) # redshift
-g = GM/(RNS*1e5)**2 * ZZ
-Pb = g*yb
+Pb = gr.grav(RNS*1e5)*yb
 rhomax = 1e7
 
 
@@ -51,8 +49,10 @@ rhomax = 1e7
 
 def photosphere(Rphot,f0):
 
-    ''' Finds photospheric density and temperature (eq 9a-b) for a given luminosity-like parameter f0 
-        Also sets Linf, the luminosity seen by observers at infinity '''
+    ''' Finds photospheric density and temperature (eq 9a-b PA86) for a given luminosity-like parameter f0 
+        Also sets Linf, the luminosity seen by observers at infinity. This is only a first approximation
+        for the photosphere values, since the optical depth of the photosphere is not actually 2/3 for the 
+        more extended models (see our paper)'''
 
     def Teff_eq(T): 
         return eos.kappa(0.,T) - (GM*c/(Rphot**2*sigmarad) * gr.Swz(Rphot)**(-1/2) * (1-10**f0))/T**4  # Assuming 0 density for opacity, which is no problem at photosphere
@@ -88,10 +88,7 @@ def derivs(r,y,Linf):
     # Version with the wind equations (with A,B,C) and v=0
     rho,T = y[:2]
     
-    # if rho<0:   
-    #     rho=1e-10
-
-    Lam = fld.Lambda(Linf,r,T,v=0)
+    Lam,_ = fld.Lambda(Linf,r,T,v=0)
 
     dlnT_dlnr = -F.Tstar(Linf, T, r, rho, v=0) - GM/c**2/r/gr.Swz(r)
     dlnrho_dlnr = (-GM/gr.Swz(r)/r * F.A(T) + F.C(Linf,T,r,rho,v=0))/F.B(T)
@@ -121,14 +118,14 @@ def Shoot_in(rspan, rho0, T0, Linf):
         return Y[0]-rho0/100
     hit_lowdensity.terminal = True # stop integrating when hit small density (means about to crash)
     
-
     sol = solve_ivp(derivs, rspan, inic, args = (Linf,), method='Radau', 
             events = (hit_innerPressure, hit_lowdensity), dense_output=True, 
                     atol=1e-6, rtol=1e-6, max_step=1e5)
+
     return sol
 
 def Error(r): # Evaluate normalized error on location of the base versus NS radius
-    return (r[-1]-RNS*1e5)/(RNS*1e5)
+    return (r[-1]/1e5-RNS)/RNS
 
 def Shoot_out(rspan, rho0, T0, Linf, rtol=1e-6, max_step=1e5):
     ''' Integrates out using r as the independent variable, until the maximum radius,
@@ -176,8 +173,8 @@ def Shoot_out(rspan, rho0, T0, Linf, rtol=1e-6, max_step=1e5):
 
 def get_rhophf0rel(Rphotkm, rend=1e9, tol=1e-6, Verbose=0, f0min=-4.5, f0max=-3.7, npts=40, spacing='linear'):
 
-    # find the value of rhoph that allow a solution to go to inf (to tol precision), for each value of f0
-    if Verbose: print('\nRphot = %.2f km\n'%Rphotkm)
+    ''' find the value of rhoph that allow a solution to go to inf (to tol precision), for each value of f0.
+        Equivalent to get_EdotTsrel for winds '''
 
     if spacing=='linear':
         f0vals = np.linspace(f0min,f0max,npts)
@@ -312,20 +309,16 @@ def OuterBisection(Rphotkm, rho0, T0, Linf, rend=1e9, Verbose=False, tol=1e-4, r
 
     # Create Radius array on which we will save points. Want many points near the photoshere to aid convergence
     if Rphotkm > RNS+0.1:
-        Rlin = np.linspace(Rphotkm*1e5, (Rphotkm+5)*1e5, 1000)
+        Rlin = np.linspace(Rphotkm*1e5, (Rphotkm+5)*1e5, 2000)
         Rlog = np.logspace(np.log10((Rphotkm+5)*1e5), np.log10(rend), 1000)
     elif Rphotkm <= RNS+0.1 and Rphotkm > RNS+0.01:
-        Rlin = np.linspace(Rphotkm*1e5, (Rphotkm+2)*1e5, 2000)
+        Rlin = np.linspace(Rphotkm*1e5, (Rphotkm+2)*1e5, 3000)
         Rlog = np.logspace(np.log10((Rphotkm+1)*1e5), np.log10(rend), 1000)
     else:
-        Rlin = np.linspace(Rphotkm*1e5, (Rphotkm+0.5)*1e5, 3000)
+        Rlin = np.linspace(Rphotkm*1e5, (Rphotkm+0.1)*1e5, 3000)
         Rlog = np.logspace(np.log10((Rphotkm+0.5)*1e5), np.log10(rend), 1000)
 
     R = np.concatenate((Rlin,Rlog[1:]))
-
-    # Start by finding the first point of divergence
-    # Npts = 5000
-    # R = np.logspace(np.log10(Rphotkm*1e5),np.log10(rend),Npts)  
 
 
     for i,ri in enumerate(R):
@@ -336,6 +329,11 @@ def OuterBisection(Rphotkm, rho0, T0, Linf, rend=1e9, Verbose=False, tol=1e-4, r
             break
         else:
             rhoa,rhob,Ta,Tb = conv[1:]
+
+    if i0==0 or i0==1:
+        print('Diverging at rph! The rhoph-f0 interpolation is probably wrong, maybe\
+                delete the file and re-run')
+        print(conv)
 
 
     # Construct initial arrays
@@ -417,7 +415,9 @@ def OuterBisection(Rphotkm, rho0, T0, Linf, rend=1e9, Verbose=False, tol=1e-4, r
             if count == 100:
                 rx,rhox,Tx = R[len(rho)-1], rho[-1], T[-1]
                 if abs(Tx-T_thin(Linf,rx))/T_thin(Linf,rx) < 1e-3:
-                    if Verbose: print('Reached optically thin limit at r=%.4f km'%(rx/1e5))
+                    # if Verbose: 
+                    if True:
+                        print('Reached optically thin limit at r=%.4f km'%(rx/1e5))
                 
                     # Append optically thin limit: T \propto r^-1/2, rho\approx 0
    
@@ -453,7 +453,7 @@ def OuterBisection(Rphotkm, rho0, T0, Linf, rend=1e9, Verbose=False, tol=1e-4, r
 
 
             
-def MakeEnvelope(Rphotkm, rend=1e9, Verbose=False, tol=1e-4, return_stuff=False): 
+def MakeEnvelope(Rphotkm, rend=1e9, Verbose=False, tol=1e-6, return_stuff=False): 
 
     global Linf             # that way Linf does not have to always be a function input parameter
     Rphot = Rphotkm*1e5
@@ -468,7 +468,7 @@ def MakeEnvelope(Rphotkm, rend=1e9, Verbose=False, tol=1e-4, return_stuff=False)
         
         if Rphotkm>=RNS+1:
             get_rhophf0rel(Rphotkm, Verbose=Verbose)
-        elif Rphotkm<RNS+0.02:
+        elif Rphotkm<=RNS+0.01:
             get_rhophf0rel(Rphotkm, f0max=-1e-4, f0min=-1, npts=100, Verbose=Verbose, spacing='log')
         else:
             get_rhophf0rel(Rphotkm, f0max=-1e-3, npts=100, Verbose=Verbose)
@@ -533,8 +533,8 @@ def MakeEnvelope(Rphotkm, rend=1e9, Verbose=False, tol=1e-4, return_stuff=False)
         if Ea==-1:
             print('fa=%.6f -> crashed to low density at r=%.3f km'%(a,sola.t_events[1][0]/1e5))
         else:
-            print('fa=%.6f -> hit inner pressure at at r=%.3f km'%(a,sola.t_events[0][0]/1e5))
-        print('fb=%.6f -> hit inner pressure at r=%.3f km\n\n'%(b,solb.t_events[0][0]/1e5))
+            print('fa=%.6f -> hit inner pressure at r=%.5f km'%(a,sola.t_events[0][0]/1e5))
+        print('fb=%.6f -> hit inner pressure at r=%.5f km\n\n'%(b,solb.t_events[0][0]/1e5))
 
     if return_stuff:
         stuff.append([a,sola,b,solb])
@@ -561,9 +561,13 @@ def MakeEnvelope(Rphotkm, rend=1e9, Verbose=False, tol=1e-4, return_stuff=False)
     rhoa,rhob,Ta,Tb = [0 for i in range(4)]
     f0 = b
 
-    r,rho,T = [np.array([]) for i in range(3)]       
+    r,rho,T = [np.array([]) for i in range(3)]  
+
+    hit_Pb = False     
  
-    while abs(Em)>tol:   # we can stop when the final radius is the neutron star radius close to one part in 10^5
+    while abs(Em)>tol or hit_Pb==False:   
+        # we can stop when the final radius is the neutron star radius close to one part in 10^5
+        # But we also want the final solution solm to be one that stops when we hit P=Pg
         
         # middle point.  In the first integration, a&b are the f values.  In the rest, a&b are between 0 and 1. For interpolation
         m = (a+b)/2
@@ -582,17 +586,18 @@ def MakeEnvelope(Rphotkm, rend=1e9, Verbose=False, tol=1e-4, return_stuff=False)
                 print('We begin the bissection with values for the photoshere')
                 print('f = %.3e \t Linf = %.3e \t Tph = %.3e \t rhoph = %.3e'%(f0,Linf,T_phot,rho_phot))
             x = fld.x(Linf,Rphot,T_phot,v=0)
-            Lam = fld.Lambda(Linf,Rphot,T_phot,v=0)
+            Lam,_ = fld.Lambda(Linf,Rphot,T_phot,v=0)
             if Verbose:
                 print('x = %.3f \t lambda = %.3f'%(x,Lam))
-                print('L/4pir^2sigT^4 = %.3f'%(F/sigmarad/T_phot**4))
+                # print('L/4pir^2sigT^4 = %.3f'%(F/sigmarad/T_phot**4))
                 print('\nRadius (km) \t Step # \t Iter count \t RNS error')   
         
-            
         # Bisection : check which side the new solution lands on and update either a or b
         if len(solm.t_events[0])==1:  # hit inner pressure
+            hit_Pb = True
             Em = Error(solm.t)
         else:
+            hit_Pb = False
             Em = -1  # just need to have a negative value
 
         if Ea*Em>0:
@@ -627,7 +632,11 @@ def MakeEnvelope(Rphotkm, rend=1e9, Verbose=False, tol=1e-4, return_stuff=False)
             sys.exit("Could not arrive at the neutron star radius! Exiting after being stuck at the same step for %d iterations"%nitermax)
 
     # Reached precision criteria for error on radius
-    if Verbose: print('Reached surface at r=%.5f km!\n'%(solm.t[-1]/1e5))
+    # if Verbose: 
+    if True:
+        print('Found base at r=%.5f km!'%(solm.t[-1]/1e5))
+        rhob,Tb = solm.y[:,-1]
+        print('y=P/g= %.3e g/cm2\n'%(eos.pressure(rhob,Tb,1/3,0)/gr.grav(RNS*1e5)))
 
     # Fill out arrays    
     r,rho,T  = np.insert(r,0,Rphot), np.insert(rho,0,rho_phot), np.insert(T,0,T_phot)

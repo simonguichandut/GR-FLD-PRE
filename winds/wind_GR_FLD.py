@@ -41,9 +41,7 @@ LEdd = F.LEdd
 # Base boundary condition
 M,RNS,yb = params['M'],params['R'],params['yb']
 GM = 6.6726e-8*2e33*M
-ZZ = (1-2*GM/(c**2*RNS*1e5))**(-1/2) # redshift
-g = GM/(RNS*1e5)**2 * ZZ
-Pb = g*yb
+Pb = gr.grav(RNS*1e5)*yb
 rhomax = 1e7
 
 
@@ -77,6 +75,9 @@ def solve_energy(r,v,T):
             return Edot - Mdot*eos.H(rho, T, Lam, R)*gr.Y(r, v) - Lstar
 
         Lstar = brentq(energy_error, Lstar1, Lstar2, xtol=1e-6, rtol=1e-8) #brentq is fastest
+        x = fld.x(Lstar,r,v,T)
+        # if x-1>1e-3:
+        #     print('causality warning : F>cE (x-1=%.1e) (after solve_energy!?)'%(x-1))
         return Lstar
 
 def uphi(phi, T, subsonic):
@@ -200,6 +201,10 @@ def dr(r, y, subsonic):
     T, phi = y[:2]
     u, rho, phi, Lstar = calculateVars_phi(r, T, phi=phi, subsonic=subsonic)
 
+    x = fld.x(Lstar,r,T,u)
+    if x-1>1e-4:
+        print('causality warning : F>cE (x-1=%.1e) (during integration)'%(x-1))
+
     Lam,_ = fld.Lambda(Lstar,r,T,u)
     dlnT_dlnr = -F.Tstar(Lstar, T, r, rho, u) - GM/c**2/r/gr.Swz(r)
     # remove small dv_dr term which has numerical problems near sonic point
@@ -225,7 +230,6 @@ def drho(rho, y):
     dlnT_dlnr = -F.Tstar(Lstar, T, r, rho, u) - 1/gr.Swz(r) * GM/c**2/r
     dT_dr = T/r * dlnT_dlnr
 
-    # eq 6 from Paczynski
     dlnr_dlnrho = (F.B(T) - F.A(T)*u**2) / \
             ((2*u**2 - (GM/(r*gr.Y(r, u)**2))) * F.A(T) + F.C(Lstar, T, r, rho, u)) 
 
@@ -250,10 +254,10 @@ def outerIntegration(r0, T0, phi0, rmax=1e10):
             return 1
     hit_mach1.terminal = True # stop integrating at this point
    
-    def hit_1e8(r,y):
-        return uphi(y[1],y[0],subsonic=False)-1e8
-    hit_1e8.direction = -1
-    hit_1e8.terminal = True
+    # def hit_1e8(r,y):
+    #     return uphi(y[1],y[0],subsonic=False)-1e8
+    # hit_1e8.direction = -1
+    # hit_1e8.terminal = True
     
     def dv_dr_zero(r,y):
         if r>5*rs:
@@ -268,12 +272,13 @@ def outerIntegration(r0, T0, phi0, rmax=1e10):
     # Go
     inic = [T0,phi0]
     sol = solve_ivp(dr_wrapper_supersonic, (r0,rmax), inic, method='Radau', 
-                    events=(dv_dr_zero,hit_mach1,hit_1e8), dense_output=True, 
-                    atol=1e-6, rtol=1e-10, max_step=1e5)
+                    events=(dv_dr_zero,hit_mach1), dense_output=True, 
+                    atol=1e-6, rtol=1e-10, max_step=1e6)
     
     if verbose: 
         print('FLD outer integration : ',sol.message, ('rmax = %.3e'%sol.t[-1]))
     return sol
+
 
 def innerIntegration_r(rs, Ts):
     ''' Integrates in from the sonic point to 95% of the sonic point, 
@@ -341,7 +346,6 @@ def innerIntegration_rho(rho95, T95, returnResult=False):
         if len(sol.t_events[0]) == 1:  # The correct termination event 
             
             rbase = sol.y[1][-1]
-            if verbose: print('Found base at r = %.2f km\n' % (rbase/1e5))
 
             if returnResult:
                 return sol
@@ -426,12 +430,10 @@ def OuterBisection(rend=1e9,tol=1e-5):
             raise Exception('Should run ImproveRoot')
             # break
 
-    # we want sola to be the one that reaches dv/dr=0, so have the smaller Ts
-    if sola.status == -1:
-        print('switching sola and solb')
-        Tsc,rsc,solc = Tsb,rsb,solb
-        Tsb,rsb,solb = Tsa,rsa,sola
-        Tsa,rsa,sola = Tsc,rsc,solc
+
+    # if sola was the high Ts one, switch sola and solb (just because convenient)
+    if direction == -1:
+        (rsa,Tsa,sola),(rsb,Tsb,solb) = (rsb,Tsb,solb),(rsa,Tsa,sola)
 
     if verbose:
         print('Two initial solutions. sonic point values:')
@@ -455,18 +457,19 @@ def OuterBisection(rend=1e9,tol=1e-5):
     # choose colder (larger) rs (rsa) as starting point because 
     # sola(rsb) doesnt exist
 
+    # for i,ri in enumerate(R):
+        # if ri>sola.t[0] and ri>solb.t[0]:
     for i,ri in enumerate(R):
-        if ri>sola.t[0] and ri>solb.t[0]:
-            conv = check_convergence(sola,solb,ri)
-            if conv[0] is False:
-                i0=i            # i0 is index of first point of divergence
-                break
-            else:
-                Ta,Tb,phia,phib = conv[1:]
+        conv = check_convergence(sola,solb,ri)
+        if conv[0] is False:
+            i0=i            # i0 is index of first point of divergence
+            break
+        else:
+            Ta,Tb,phia,phib = conv[1:]
 
-    if i0==0:
+    if i0==0 or i==1:
         print('Diverging at rs!')
-        print(conv)
+        print(conv[1:])
         print('rs=%.5e \t rsa=%.5e \t rsb=%.5e'%(rs,rsa,rsb))
         
     # Construct initial arrays
@@ -485,10 +488,6 @@ def OuterBisection(rend=1e9,tol=1e-5):
         print('rconv (km) \t Step # \t Iter \t m')  
 
     # input('Pause before starting. Press enter')
-
-    # if sola was the high Ts one, switch sola and solb (just because convenient)
-    if direction == -1:
-        (rsa,Tsa,sola),(rsb,Tsb,solb) = (rsb,Tsb,solb),(rsa,Tsa,sola)
 
     a,b = 0,1
     step,count = 0,0
@@ -549,6 +548,13 @@ def OuterBisection(rend=1e9,tol=1e-5):
                 T,Phi = update_arrays(T,Phi,solm.sol,R,i0,i-1)  # i-1 is where we converged last
                 i0=i # next time we append
 
+            if count==5:
+                print('I seem to be a bit stuck, here are some results')
+                print('sola:',sola.status,sola.t_events)
+                print('solb:',solb.status,solb.t_events)
+                print('conv:',conv)
+                input()
+
         # Exit if stuck at one step
         nitermax=1000
         if count==nitermax:
@@ -556,7 +562,8 @@ def OuterBisection(rend=1e9,tol=1e-5):
                         stuck at the same step for %d iterations"%nitermax)
 
         # End of step
-        if verbose: print('%.4e \t %d \t\t %d \t\t %f'%(rconv,step,count,m))
+        if verbose and do_bisect: 
+            print('%.4e \t %d \t\t %d \t\t %f'%(rconv,step,count,m))
 
     return R,T,Phi
 
@@ -592,7 +599,7 @@ def MakeWind(root, logMdot, Verbose=0, outer_only=(False,), inner_only=(False,))
         print('Change in sonic point (caused by error in Edot-Ts relation interpolation)')
         print('root:\t Ts = %.5e \t rs = %.5e'%(Ts,rs))
         print('new:\t  Ts = %.5e \t rs = %.5e'%(Tsnew,rsnew))
-        print('Judge if this is a problem or not')
+        print('Judge if this is a problem or not\n')
         rs,Ts = rsnew,Tsnew
 
     else:
@@ -622,6 +629,10 @@ def MakeWind(root, logMdot, Verbose=0, outer_only=(False,), inner_only=(False,))
         rho_inner2 = np.logspace(np.log10(rho95) , np.log10(result_inner2.t[-1]), 2000)
         T_inner2, r_inner2 = result_inner2.sol(rho_inner2)
         
+        print('Found base at r = %.2f km' % (r_inner2[-1]/1e5))
+        rhob,Tb = rho_inner2[-1], T_inner2[-1]
+        print('y=P/g= %.3e g/cm2\n'%(eos.pressure(rhob,Tb,1/3,0)/gr.grav(RNS*1e5)))
+
 
         # Attaching arrays for r,rho,T from surface to photosphere  
         #  (ignoring first point in inner2 because duplicate values at r=r95)

@@ -144,17 +144,16 @@ def clean_wind_rootfile(warning=1):
             new_roots.append(roots[i])
             
         if warning:
-            o = input('Roots file will be overwritten. Proceed? (0 or 1) ')
+            o = eval(input('Roots file will be overwritten. Proceed? (0 or 1) '))
         else:
             o = 1
-        if o:
+        if o == True:
             filename = get_name()
             path = 'winds/roots/roots_' + filename + '.txt'
             os.remove(path)
-
             for x,y in zip(new_logMdots,new_roots): 
-                decimals = max((len(str(y[0])),len(str(y[1])))) - 2   
-                # print(decimals)             
+                decimals = max((len(str(y[0])),len(str(y[1])))) - 2  
+                if decimals<8: decimals=8 #if by chance both 8th decimals are zero 
                 save_wind_root(x,y,decimals=decimals)
 
 
@@ -186,7 +185,7 @@ def write_wind(logMdot,wind):
 
             f.write('\n')
 
-    print('Wind data saved at: ',filename)
+    print('\nWind data saved at: ',filename)
 
 
 def load_wind(logMdot, specific_file=None):
@@ -328,7 +327,7 @@ def write_envelope(Rphotkm,env):
     path = 'envelopes/models/' + get_name(include_Prad=False) + '/'
 
     if Rphotkm >= load_params()['R']+1:
-                filename = path + str(Rphotkm) + '.txt'
+        filename = path + str(Rphotkm) + '.txt'
     else:
         filename = path + str(Rphotkm).replace('.','_') + '.txt'
 
@@ -343,6 +342,8 @@ def write_envelope(Rphotkm,env):
                 (env.r[i], env.rho[i], env.T[i]))    
 
             f.write('\n')
+    
+    print('\nEnvelope data saved at: ',filename)
 
 
 def load_envelope(Rphotkm, specific_file=None):
@@ -383,7 +384,10 @@ def load_envelope(Rphotkm, specific_file=None):
 
 def save_rhophf0rel(Rphotkm, f0vals, rhophvalsA, rhophvalsB):
 
-    path = 'envelopes/roots/' + get_name(include_Prad=False)
+    name = get_name(include_Prad=False)
+    i = name.find('y')
+    name = name[:i-1] + name[i+2:]
+    path = 'envelopes/roots/' + name
 
     if not os.path.exists(path):
         os.mkdir(path)
@@ -406,7 +410,12 @@ def load_rhophf0rel(Rphotkm):
     s = str(Rphotkm)
     if s[-2:]=='.0': s=s[:-2]
 
-    filepath = 'envelopes/roots/' + get_name(include_Prad=False) + '/rhophf0rel_' + s + '.txt'
+    name = get_name(include_Prad=False)
+    i = name.find('y')
+    name = name[:i-1] + name[i+2:]
+    path = 'envelopes/roots/' + name
+
+    filepath = 'envelopes/roots/' + name + '/rhophf0rel_' + s + '.txt'
     if not os.path.exists(filepath):
         return False,
 
@@ -448,7 +457,11 @@ def clean_rhophf0relfile(Rphotkm,warning=1):
         else:
             o = 1
         if o:
-            filepath = 'envelopes/roots/'+get_name(include_Prad=False)+'/rhophf0rel_'+str(Rphotkm)+'.txt'
+            name = get_name(include_Prad=False)
+            i = name.find('y')
+            name = name[:i-1] + name[i+2:]
+
+            filepath = 'envelopes/roots/'+name+'/rhophf0rel_'+str(Rphotkm)+'.txt'
             os.remove(filepath)
 
             save_rhophf0rel(Rphotkm,new_f0vals,new_rhophvalsA,new_rhophvalsB)
@@ -531,7 +544,7 @@ def export_grid(target = "."):
             f.write('%0.4e       %0.4e        ' % (env.Linf,env.Linf))
 
             # Mdot,Edot
-            f.write('0' + ' '*13 + '%0.4e   L   '%env.Linf)
+            f.write('0' + ' '*13 + '%0.4e      '%env.Linf)
 
             # rs,rph
             f.write('0' + ' '*13 + '%0.4e    ' % env.rph)

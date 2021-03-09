@@ -68,7 +68,7 @@ class EquationOfState:
         self.kappa0 = 0.2 * (1+self.X)                              # https://www.astro.princeton.edu/~gk/A403/opac.pdf
 
 
-    # Opacitioes
+    # Opacities
     def kff(self,rho,T):
         if self.comp in ('He','H','Ni'):
             return 1e23*self.Zno**2/(self.mu_e*self.mu_I)*rho*T**(-7/2)
@@ -79,7 +79,7 @@ class EquationOfState:
         return self.kappa0/(1.0+(T/4.5e8)**0.86) 
 
     def kappa(self,rho,T):
-        return self.kes(T)    
+        return self.kes(T)                          # only electron scattering for the paper
         # return self.kes(rho,T) + self.kff(rho,T)
 
     # Ideal gas sound speed c_s^2
@@ -169,7 +169,6 @@ class FluxLimitedDiffusion():
 
         Lam = 1/12 * ( (2-3*x) + sqrt(-15*x**2 + 12*x + 4) )  # 1/3 thick , 0 thin
         R = x/Lam # 0 thick, 1/lam->inf thin
-
         return Lam,R
 
 

@@ -167,7 +167,7 @@ def get_EdotTsrel(logMdot,tol=1e-5,Verbose=0,Edotmin=1.01,Edotmax=1.04,npts=10,s
     IO.clean_EdotTsrelfile(logMdot,warning=0)
 
 
-def Check_EdotTsrel(logMdot, recalculate=True):
+def Check_EdotTsrel(logMdot, recalculate=True, near_root_only=False):
 
     # Suppose the EdotTsrel is slightly wrong, namely the solutions corresponding
     # to logTsa and logTsb are not binding, they both crash in the same direction.
@@ -177,6 +177,36 @@ def Check_EdotTsrel(logMdot, recalculate=True):
 
     IO.clean_EdotTsrelfile(logMdot, warning=0)
     _,Edotvals,TsvalsA,TsvalsB = IO.load_EdotTsrel(logMdot)
+
+    # Option : only check for 3 values on each side of the root
+    if near_root_only:
+
+        Edotroot = IO.load_wind_roots(logMdot=logMdot)[0]        
+        Edotvalsnew,TsvalsAnew,TsvalsBnew = [],[],[]
+
+        # Edots<Edot root
+        k=0
+        for E in [Edot for Edot in Edotvals if Edot<Edotroot][::-1]:
+            if k<4:
+                Edotvalsnew.append(E)
+                i = Edotvals.index(E)
+                TsvalsAnew.append(TsvalsA[i])
+                TsvalsBnew.append(TsvalsB[i])
+            k+=1
+        Edotvalsnew,TsvalsAnew,TsvalsBnew = Edotvalsnew[::-1],TsvalsAnew[::-1],TsvalsBnew[::-1]
+
+        # Edots>Edot root
+        k=0
+        for E in [Edot for Edot in Edotvals if Edot>Edotroot]:
+            if k<4:
+                Edotvalsnew.append(E)
+                i = Edotvals.index(E)
+                TsvalsAnew.append(TsvalsA[i])
+                TsvalsBnew.append(TsvalsB[i])
+            k+=1
+
+        Edotvals,TsvalsA,TsvalsB = Edotvalsnew,TsvalsAnew,TsvalsBnew
+
 
     print('\n Checking EdotTs rel for %d Edot values'%len(Edotvals))
 
@@ -200,12 +230,12 @@ def Check_EdotTsrel(logMdot, recalculate=True):
                 print('Initial bounds of logTs : %.8f   %.8f'%(logTsa,logTsb))
                 if sola.status == -1:
                     while sola.status == -1:
-                        logTsa -= 2e-2
+                        logTsa -= 1e-3
                         sola,_ = run_outer(logMdot,Edotvals[i],logTsa)
 
                 elif solb.status == 1:
                     while solb.status == 1:
-                        logTsb += 2e-2
+                        logTsb += 1e-3
                         solb,_ = run_outer(logMdot,Edotvals[i],logTsb)
 
                 a,b = bound_Ts_for_Edot(logMdot,Edotvals[i],logTsa,logTsb)
@@ -296,6 +326,7 @@ def RootFinder(logMdot,checkrel=True,Verbose=False,depth=1):
 
     flag_300 = (False,)
     erra = Err(Edotvals[0])
+
     for Edot in Edotvals[:0:-1]: # cycle through the values in reverse order
         errb = Err(Edot)
 
@@ -308,21 +339,23 @@ def RootFinder(logMdot,checkrel=True,Verbose=False,depth=1):
 
     if erra*errb > 0: # same sign (we'll enter this if we didn't break last loop)
 
-        if not flag_300[0]:
-            if erra<0:
-                print('\nOnly negative errors (rb<RNS)') # need smaller Ts (smaller Edot)
-                diff = Edotvals[1]-Edotvals[0]
-                get_EdotTsrel(logMdot,Edotmin=Edotvals[0]-diff,Edotmax=Edotvals[0]-1e-8,npts=2*depth)
-            else:
+        if erra<0:
+            print('\nOnly negative errors (rb<RNS)') # need smaller Ts (smaller Edot)
+            diff = Edotvals[1]-Edotvals[0]
+            get_EdotTsrel(logMdot,Edotmin=Edotvals[0]-1e-3,Edotmax=Edotvals[0]-1e-8,npts=2*depth)
+
+        else:
+
+            if not flag_300[0]:
                 print('\nOnly positive errors (rb>RNS)') # need higher Ts (higher Edot)
                 diff = Edotvals[-1]-Edotvals[-2]
                 get_EdotTsrel(logMdot,Edotmin=Edotvals[-1]+1e-8,Edotmax=Edotvals[-1]+diff,npts=2*depth)
 
-        else:
-            print('\nThe only negative errors (rb<RNS) don''t converge, need to refine')
-            i = flag_300[1]
-            diff = Edotvals[i]-Edotvals[i-1]
-            get_EdotTsrel(logMdot,Edotmin=Edotvals[i-1]+0.25*diff,Edotmax=Edotvals[i-1]+0.75*diff,npts=2*depth,tol=1e-9,save_decimals=10)
+            else:
+                print('\nThe only negative errors (rb<RNS) don''t converge, need to refine')
+                i = flag_300[1]
+                diff = Edotvals[i]-Edotvals[i-1]
+                get_EdotTsrel(logMdot,Edotmin=Edotvals[i-1]+0.25*diff,Edotmax=Edotvals[i-1]+0.75*diff,npts=2*depth,tol=1e-9,save_decimals=10)
 
 
         raise Exception('Call Again')
@@ -354,9 +387,7 @@ def ImproveRoot(logMdot, eps=0.1, npts=5):
         sys.exit("root doesn't exist")
     root = roots[logMdots.index(logMdot)]
 
-    decimals = 10 if logMdot < 17 else 8
-
-    if logMdot<17:
+    if logMdot<17.25:
         decimals,tol = 10,1e-10
     else:
         decimals,tol = 8,1e-8
@@ -405,6 +436,9 @@ def recursor(logMdot, depth=1, max_depth=5):
 def driver(logmdots):
 
     if logmdots == 'all':
+        logmdots = IO.load_wind_roots()[0]
+
+    elif logmdots == 'all_models':
         logmdots = IO.get_wind_list()[::-1]
 
     elif type(logmdots) == float or type(logmdots) == int:
@@ -454,6 +488,8 @@ if __name__ == "__main__":
 
         if sys.argv[1]=='all':
             logmdots='all'
+        elif sys.argv[1]=='all_models':
+            logmdots='all_models'
         elif ',' in sys.argv[1]:
             logmdots = eval(sys.argv[1])
         else:
