@@ -36,7 +36,7 @@ def run_envelopes(Rphotkm_list):
 
 
 
-def run_wind(logMdot_list):
+def run_wind(logMdot_list=IO.load_wind_roots()[0][::-1]):
 
     # Roots
     logMdot_get_root = [logMdot for logMdot in logMdot_list if logMdot not in IO.load_wind_roots()[0]]
@@ -96,7 +96,10 @@ if __name__ == '__main__':
             else:
                 l = [eval(s) for s in sys.argv[2].split(',')]
         except:
-            sys.exit(err_messages[1])
+            if sys.argv[1] not in ('envelope','wind'):
+                sys.exit(err_messages[0])
+            else:
+                sys.exit(err_messages[1])
 
         if sys.argv[1] == 'envelope':
             if min(l)<IO.load_params()['R'] or max(l)>100:

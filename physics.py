@@ -78,6 +78,10 @@ class EquationOfState:
     def kes(self,T):
         return self.kappa0/(1.0+(T/4.5e8)**0.86) 
 
+    # Electron scattering with degeneracy corrections (not in paper)
+    # def kes(self,rho,T):
+    #     return self.kappa0/ (1.0+(T/4.5e8)**0.86) / (1+2.7e11*rho/T**2)
+
     def kappa(self,rho,T):
         return self.kes(T)                          # only electron scattering for the paper
         # return self.kes(rho,T) + self.kff(rho,T)

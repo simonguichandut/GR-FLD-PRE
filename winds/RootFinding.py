@@ -58,7 +58,7 @@ def bound_Ts_for_Edot(logMdot,Edot_LEdd,logTsa0,logTsb0,npts_Ts=10,tol=1e-5,Verb
     # If roots already exist for this Mdot, we can predict where Ts might be, and use that
     # to avoid wasting time searching where it will not be
     try:
-        logMdots,roots = IO.load_roots()
+        logMdots,roots = IO.load_wind_roots()
         elts = [i for i in range(len(logMdots)) if logMdots[i]>logMdot] # grab Mdots larger than current one
         if len(elts)>=2:
             x1,x2 = logMdots[elts[0]], logMdots[elts[1]]
@@ -100,8 +100,9 @@ def bound_Ts_for_Edot(logMdot,Edot_LEdd,logTsa0,logTsb0,npts_Ts=10,tol=1e-5,Verb
 
         if logTs_pred is not None:
             if a - logTs_pred > 0.3:
-                print('Bottom logTs (%.2f) too far from where the root will realistically be (prediction from two other Mdots is logTs=%.2f'%(a,logTs_pred))
+                print('Bottom logTs (%.2f) too far from where the root will realistically be (prediction from two other Mdots is logTs=%.2f)'%(a,logTs_pred))
                 return None,None
+
 
         if a==b:
             print('border values equal (and did not hit rs<RNS, maybe allow higher Ts). Exiting')
@@ -113,7 +114,7 @@ def bound_Ts_for_Edot(logMdot,Edot_LEdd,logTsa0,logTsb0,npts_Ts=10,tol=1e-5,Verb
     return a,b
 
 
-def get_EdotTsrel(logMdot,tol=1e-5,Verbose=0,Edotmin=1.01,Edotmax=1.04,npts=10,save_decimals=8):
+def get_EdotTsrel(logMdot,tol=1e-5,Verbose=0,Edotmin=1.01,Edotmax=1.03,npts=10,save_decimals=8):
 
     # find the value of Ts that allow a solution to go to inf (to tol precision), for each value of Edot
 
@@ -247,7 +248,7 @@ def Check_EdotTsrel(logMdot, recalculate=True, near_root_only=False):
     IO.clean_EdotTsrelfile(logMdot,warning=0)
 
 
-def RootFinder(logMdot,checkrel=True,Verbose=False,depth=1):
+def RootFinder(logMdot,checkrel=True,Verbose=False,depth=1,lower_TsA=None):
 
     """ Find the (Edot,Ts) pair that minimizes the error on the inner boundary condition """
 
@@ -286,6 +287,11 @@ def RootFinder(logMdot,checkrel=True,Verbose=False,depth=1):
     
     if Verbose: print('Loaded Edot-Ts relation from file')
     _,Edotvals,TsvalsA,TsvalsB = rel
+
+    if lower_TsA is not None:
+        print('lowering Tsa')
+        TsvalsAnew = [(Ts-lower_TsA) for Ts in TsvalsA]
+        TsvalsA = TsvalsAnew
 
     # Check if file is correct, i.e the two Ts values diverge in different directions
     if checkrel:
@@ -342,14 +348,14 @@ def RootFinder(logMdot,checkrel=True,Verbose=False,depth=1):
         if erra<0:
             print('\nOnly negative errors (rb<RNS)') # need smaller Ts (smaller Edot)
             diff = Edotvals[1]-Edotvals[0]
-            get_EdotTsrel(logMdot,Edotmin=Edotvals[0]-1e-3,Edotmax=Edotvals[0]-1e-8,npts=2*depth)
+            get_EdotTsrel(logMdot,Edotmin=Edotvals[0]-1e-3,Edotmax=Edotvals[0]-1e-8,npts=2)
 
         else:
 
             if not flag_300[0]:
                 print('\nOnly positive errors (rb>RNS)') # need higher Ts (higher Edot)
                 diff = Edotvals[-1]-Edotvals[-2]
-                get_EdotTsrel(logMdot,Edotmin=Edotvals[-1]+1e-8,Edotmax=Edotvals[-1]+diff,npts=2*depth)
+                get_EdotTsrel(logMdot,Edotmin=Edotvals[-1]+diff/10,Edotmax=Edotvals[-1]+diff,npts=1+depth)
 
             else:
                 print('\nThe only negative errors (rb<RNS) don''t converge, need to refine')
@@ -367,7 +373,7 @@ def RootFinder(logMdot,checkrel=True,Verbose=False,depth=1):
         return root
 
 
-def ImproveRoot(logMdot, eps=0.1, npts=5):
+def ImproveRoot(logMdot, eps=0.1, npts=5, rootfind=True):
 
     ''' Rootfinding with the inner b.cond is done on a spline interpolation of 
     the Edot-Ts relation. When that root is obtained, it's not exact because of 
@@ -402,9 +408,62 @@ def ImproveRoot(logMdot, eps=0.1, npts=5):
     get_EdotTsrel(logMdot,Edotmin=bound1,Edotmax=bound2,npts=npts,tol=tol,save_decimals=decimals)
     #get_EdotTsrel(logMdot,Edotmin=root[0]-eps,Edotmax=root[0]+eps,npts=8)
     IO.clean_EdotTsrelfile(logMdot,warning=0)
-    root = RootFinder(logMdot,checkrel=False)
-    IO.save_wind_root(logMdot,root,decimals=decimals)
-    IO.clean_wind_rootfile(warning=0)
+
+    if rootfind:
+        root = RootFinder(logMdot,checkrel=False)
+        IO.save_wind_root(logMdot,root,decimals=decimals)
+        IO.clean_wind_rootfile(warning=0)
+
+
+def do_the_thing(logMdot):
+
+    ''' The thing for which I can't find a good name...
+    How does MakeWind (in wind_GR_FLD.py) make a wind from a root? It takes that root to integrate out
+    and see which direction it diverges in. If the sonic point is "cold" (Ts is "small"), the integration
+    will stop when reaching dv/dr=0. If the sonic point is hot (Ts is large), the integration will crash
+    when the stepsize becomes too small. Then, we find another value of Ts that diverges in the opposite
+    direction to begin the bisection. We label the final cold Ts "Tsa" and hot Ts "Tsb". Importantly, because
+    of interpolation errors, the interpolated root can be either hot or cold. Indeed, even though we fit on
+    a spline interpolated with Tsa values in the files, the Ts of the root can be hot, and in the end become
+    the Tsb value. Now here's the thing: Tsa<Tsb => rsa>rsb. In the bisection we are comparing values of 
+    sola and solb at every radius, but sola(rsb) does not exist! So the final sonic point has to be rsa,Tsa!
+    And if the root turned out to be Tsb, the new sonic point will no longer integrate to the correct NS
+    radius, it's not a root! This is why when running the code normally, some models (more at low Mdot but
+    also sort of random), have the first radius point 1 or 2 (or more) km off the NS radius.
+
+    What's the solution? We want all values on the Tsa spline to be true "cold" sonic points, so that the 
+    root is kept at the beginning of the bisection algorithm. We can do this by interpolating lowered values
+    of Tsa from the files, hence the "lower_TsA" argument of RootFinder(). We want to lower it as little as 
+    possible so we can go iteratively.
+
+    Before doing this, make sure there are enough points in the EdotTsrel file so that the interpolation
+    is actually decent. Run ImproveRoot(logMdot, npts=5) (or more points, judge by looking at the file).
+    '''
+    
+    decimals = 10 if logMdot<17.25 else 8
+
+    root = IO.load_wind_roots(logMdot)
+    sol,_ = run_outer(logMdot,root[0],root[1])
+
+    step,n = 1e-6,1
+    while sol.status == -1:
+        print('iteration %d'%n)
+        root = RootFinder(logMdot,checkrel=False,lower_TsA=n*step)
+
+        # The root that is saved in the file will be rounded to a certain number of decimal places
+        # we have to check the result for the rounded value
+        root = [np.round(root[0],decimals=decimals),np.round(root[1],decimals=decimals)]
+        sol,_ = run_outer(logMdot,root[0],root[1])
+
+        n+=1
+        if n==10:
+            print('Not working after 20 steps, did you run ImproveRoot?')
+            break
+
+    if sol.status == 1: # success
+        IO.save_wind_root(logMdot,root,decimals=decimals)
+        IO.clean_wind_rootfile(warning=0)
+        print('Now remake the wind!')
 
 
 
@@ -456,7 +515,7 @@ def driver(logmdots):
 
             else:
                 success.append(logMdot)
-                if logMdot<17:
+                if logMdot<17.25:
                     IO.save_wind_root(logMdot,root,decimals=10)
                 else:
                     IO.save_wind_root(logMdot,root)

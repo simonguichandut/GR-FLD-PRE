@@ -202,7 +202,7 @@ def dr(r, y, subsonic):
     u, rho, phi, Lstar = calculateVars_phi(r, T, phi=phi, subsonic=subsonic)
 
     x = fld.x(Lstar,r,T,u)
-    if x-1>1e-4:
+    if x-1>1e-3:
         print('causality warning : F>cE (x-1=%.1e) (during integration)'%(x-1))
 
     Lam,_ = fld.Lambda(Lstar,r,T,u)
@@ -404,20 +404,13 @@ def OuterBisection(rend=1e9,tol=1e-5):
     elif sola.status == -1:
         direction = -1 # diverged, other solution needs to have smaller Ts
 
-    if verbose: print('Finding second solution')
-    # step = 1e-6 if np.log10(Mdot)>=17 else 1e-8
-    # step = 5e-6
-    step=1e-8 # might need to switch to this at lowest end of Mdot (did that for the logMdot 16.8 model)
+    if verbose: print('\nFinding second solution')
+    
+    step = 1e-6
+    # step=1e-8 # might need to switch to this at lowest end of Mdot (did that for the logMdot 16.8 model)
     Tsb,rsb,solb = Tsa,rsa,sola
     i=0
     while solb.status == sola.status:
-
-        # if i>0: 
-        #     Tsa,rsa,sola = Tsb,rsb,solb  
-        #     # might as well update solution a 
-        #     # (since this process gets closer to the right Ts)
-        # Actually don't do this because it messes with the rootfinding 
-        # (inward integration might no longer land on rb=RNS, but it sure does with the initial rsa because it's a root)
 
         logTsb = np.log10(Tsb) + direction*step
         Tsb = 10**logTsb
@@ -429,8 +422,6 @@ def OuterBisection(rend=1e9,tol=1e-5):
                     direction after changing Ts by 20 tolerances.  \
                     Problem in the TsEdot interpolation')
             raise Exception('Should run ImproveRoot')
-            # break
-
 
     # if sola was the high Ts (low rs, diverging) one, switch sola and solb, so that
     # sola is the one that goes to dv/dr=0
@@ -455,7 +446,11 @@ def OuterBisection(rend=1e9,tol=1e-5):
 
 
     # Start by finding the first point of divergence
+    # Make the radius array: linear for the first 10km after rs, then log until the end
     Npts = 1000
+    # Rlin = np.linspace(rsa, rsa+1e6, int(Npts/2))
+    # Rlog = np.logspace(np.log10(rsa+1e6), np.log10(rend), Npts)
+    # R = np.concatenate((Rlin,Rlog[1:]))
     R = np.logspace(np.log10(rsa),np.log10(rend),Npts)   
     # choose colder (larger) rs (rsa) as starting point because 
     # sola(rsb) doesnt exist
