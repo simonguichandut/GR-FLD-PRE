@@ -163,8 +163,8 @@ class FluxLimitedDiffusion():
 
         x = self.x(Lstar,r,T,v)
 
-        if isinstance(Lstar, (list,tuple,ndarray)): 
-            if len(x[x>1])>0:
+        if isinstance(r, (list,tuple,ndarray)): 
+            if len(x[x>1+1e-5])>0:
                 raise Exception("Causality warning F>cE at %d locations"%len(x[x>1]))
         else:
             if x>1:

@@ -3,12 +3,16 @@
 
 # scripts
 temp.py
+energy.py
 
 # models
 # *Ni_M*
 
 # other files
 grid*
+energies*
 
 #paper_plots.py
 paper_plots/
+new_plots.py
+new_plots/

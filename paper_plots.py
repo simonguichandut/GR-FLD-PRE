@@ -93,7 +93,8 @@ from winds.wind_GR_FLD import *
 from envelopes.env_GR_FLD import *
 
 
-
+img = 'pdf'
+dpi = 300 if img == 'png' else None
 
 
 
@@ -154,11 +155,12 @@ def Make_lineshift_plot(figsize):
     ax2.set_ylim([-0.008,0.023])
 
     ax2.text(0.98,0.9,r'All models, values at $r_\mathrm{ph}$',fontsize=8,fontweight='bold',transform=ax2.transAxes,ha='right',va='center')
+    ax1.axhline(0,color='k',ls=':',lw=0.7)
     ax2.axhline(0,color='k',ls=':',lw=0.7)
 
 
-    fig.savefig('paper_plots/wind_lineshift.pdf',bbox_inches='tight',format='pdf')
-    print('Saved figure to paper_plots/wind_lineshift.pdf')
+    fig.savefig('paper_plots/wind_lineshift.'+img,bbox_inches='tight',format=img,dpi=dpi)
+    print('Saved figure to paper_plots/wind_lineshift.'+img)
 
 
 def Make_wind_paramspace_plot(figsize):
@@ -213,8 +215,8 @@ def Make_wind_paramspace_plot(figsize):
             if len(str(logMdot))==4 or str(logMdot)[-1] in ('0','5'): # don't plot e.g. 17.06
                 ax.plot(rel_rs,rel_Edot,'k-',lw=0.3,alpha=0.4)
 
-    fig.savefig('paper_plots/wind_paramspace.pdf',bbox_inches='tight',format='pdf')
-    print('Saved figure to paper_plots/wind_paramspace.pdf')
+    fig.savefig('paper_plots/wind_paramspace.'+img,bbox_inches='tight',format=img,dpi=dpi)
+    print('Saved figure to paper_plots/wind_paramspace.'+img)
 
 
 def Make_base_Enuc_plot(figsize):
@@ -267,8 +269,8 @@ def Make_base_Enuc_plot(figsize):
     ax.xaxis.set_minor_formatter(NullFormatter())
     
 
-    fig.savefig('paper_plots/wind_base_Enuc.pdf',bbox_inches='tight',format='pdf')
-    print('Saved figure to paper_plots/wind_base_Enuc.pdf')
+    fig.savefig('paper_plots/wind_base_Enuc.'+img,bbox_inches='tight',format=img,dpi=dpi)
+    print('Saved figure to paper_plots/wind_base_Enuc.'+img)
 
 
 def Make_Mdot_prescription_plot(figsize):
@@ -309,8 +311,8 @@ def Make_Mdot_prescription_plot(figsize):
 
     # ax.legend(frameon=False)
 
-    fig.savefig('paper_plots/Mdot_prescription.pdf',bbox_inches='tight',format='pdf')
-    print('Saved figure to paper_plots/Mdot_prescription.pdf')
+    fig.savefig('paper_plots/Mdot_prescription.'+img,bbox_inches='tight',format=img,dpi=dpi)
+    print('Saved figure to paper_plots/Mdot_prescription.'+img)
 
 
 # ---------------------------------------------- ENVELOPE PLOTS ----------------------------------------------
@@ -404,8 +406,8 @@ def Make_touchdown_error_plot(figsize):
     ax1.semilogx(rphot_newt - RNS*1e5, x, 'k:', lw=0.8, label='Newtonian models')
     ax1.legend(loc='lower center', frameon=False)
 
-    fig.savefig('paper_plots/env_touchdown.pdf',bbox_inches='tight',format='pdf')
-    print('Saved figure to paper_plots/env_touchdown.pdf')
+    fig.savefig('paper_plots/env_touchdown.'+img,bbox_inches='tight',format=img,dpi=dpi)
+    print('Saved figure to paper_plots/env_touchdown.'+img)
 
 
 def Make_env_paramspace_plot(figsize):
@@ -484,8 +486,8 @@ def Make_env_paramspace_plot(figsize):
             ax.plot(f0vals, np.log10(rhophvals),'k-', lw=0.3, alpha=0.4)
 
 
-    fig.savefig('paper_plots/env_paramspace.pdf',bbox_inches='tight',format='pdf')
-    print('Saved figure to paper_plots/env_paramspace.pdf')
+    fig.savefig('paper_plots/env_paramspace.'+img,bbox_inches='tight',format=img,dpi=dpi)
+    print('Saved figure to paper_plots/env_paramspace.'+img)
 
 
 def Make_env_energy_plot(figsize):
@@ -565,8 +567,8 @@ def Make_env_energy_plot(figsize):
     ax2.xaxis.set_minor_locator(x_minor)
     ax2.xaxis.set_minor_formatter(NullFormatter())
 
-    fig.savefig('paper_plots/env_energy.pdf',bbox_inches='tight',format='pdf')
-    print('Saved figure to paper_plots/env_energy.pdf')
+    fig.savefig('paper_plots/env_energy.'+img,bbox_inches='tight',format=img,dpi=dpi)
+    print('Saved figure to paper_plots/env_energy.'+img)
 
 
 # ----------------------------------------------- COMPARE PLOTS -----------------------------------------------
@@ -597,7 +599,7 @@ def Make_profiles_plot(figsize):
     ax1d.axhline(1,color='k',ls='--',lw=1.3)
 
     # Winds
-    # print('Wind models in profiles.pdf')
+    # print('Wind models in profiles.'+img)
     for i,logMdot in enumerate([17.25,17.5,17.75,18,18.25,18.5]):
 
         w = IO.load_wind(logMdot)
@@ -631,7 +633,7 @@ def Make_profiles_plot(figsize):
 
     # Envelopes
     Rphotkms = (13,15,20,30,40,50)
-    # print('Envelope models in profiles.pdf')
+    # print('Envelope models in profiles.'+img)
     for i,Rphotkm in enumerate(Rphotkms):
 
         env = IO.load_envelope(Rphotkm)
@@ -656,24 +658,26 @@ def Make_profiles_plot(figsize):
 
     # Arrows and annotations
     iw = np.argmin(abs(w0.r-3e6))
-    ax1a.annotate('',xy=(7e6,1e8),xytext=(w0.r[iw],w0.T[iw]),arrowprops=dict(color='tab:blue',arrowstyle='->'))
-    ax1a.annotate('',xy=(2.5e6,5e7),xytext=(14e5,1e7),arrowprops=dict(color='tab:red',arrowstyle='->'))
-    ax1a.text(x=7e6,y=2e7,s=(r'Increasing $\dot{M},L$'),fontsize=7,color='tab:blue',ha='left',va='center',rotation=-30)
+    # ax1a.annotate('',xy=(7e6,1e8),xytext=(w0.r[iw],w0.T[iw]),arrowprops=dict(color='tab:blue',arrowstyle='->',linewidth=0.8,mutation_scale=7))
+    ax1a.annotate('',xy=(7e6,1e8),xytext=(3e6,2.6e7),arrowprops=dict(color='tab:blue',arrowstyle='->',linewidth=0.8,mutation_scale=7))
+    ax1a.annotate('',xy=(2.9e6,3e7),xytext=(14e5,1e7),arrowprops=dict(color='tab:red',arrowstyle='->',linewidth=0.8,mutation_scale=7))
+    ax1a.text(x=5.8e6,y=2.5e7,s=(r'Increasing $\dot{M},L$'),fontsize=7,color='tab:blue',ha='left',va='center',rotation=-32)
     ax1a.text(x=15e5,y=5e6,s=(r'Increasing $r_\mathrm{ph},L$'),fontsize=7,color='tab:red',ha='left',va='center',rotation=-16)
 
-    ax1b.annotate('',xy=(7e6,1e-2),xytext=(w0.r[iw],w0.rho[iw]),arrowprops=dict(color='tab:blue',arrowstyle='->'))
-    ax1b.annotate('',xy=(9e6,1e-7),xytext=(14e5,1e-7),arrowprops=dict(color='tab:red',arrowstyle='->'))
+    # ax1b.annotate('',xy=(7e6,1e-2),xytext=(w0.r[iw],w0.rho[iw]),arrowprops=dict(color='tab:blue',arrowstyle='->',linewidth=0.8,mutation_scale=7))
+    ax1b.annotate('',xy=(5.5e6,5e-3),xytext=(3e6,7e-5),arrowprops=dict(color='tab:blue',arrowstyle='->',linewidth=0.8,mutation_scale=7))
+    ax1b.annotate('',xy=(9e6,1e-7),xytext=(14e5,1e-7),arrowprops=dict(color='tab:red',arrowstyle='->',linewidth=0.8,mutation_scale=7))
 
-    ax1c.annotate('',xy=(5e6,2e6),xytext=(2e6,1e7),arrowprops=dict(color='tab:blue',arrowstyle='->'))
+    ax1c.annotate('',xy=(2.7e6,3e5),xytext=(12.5e5,1e6),arrowprops=dict(color='tab:blue',arrowstyle='->',linewidth=0.8,mutation_scale=7))
 
-    ax1d.annotate('',xy=(7e6,1e-3),xytext=(3e6,2e-2),arrowprops=dict(color='tab:blue',arrowstyle='->'))
-    ax1d.annotate('',xy=(2e6,1e-2),xytext=(12e5,1e-1),arrowprops=dict(color='tab:red',arrowstyle='->'))
+    ax1d.annotate('',xy=(7.5e6,1.5e-3),xytext=(3e6,3e-2),arrowprops=dict(color='tab:blue',arrowstyle='->',linewidth=0.8,mutation_scale=7))
+    ax1d.annotate('',xy=(2e6,1e-2),xytext=(11.8e5,1e-1),arrowprops=dict(color='tab:red',arrowstyle='->',linewidth=0.8,mutation_scale=7))
 
 
-    ax1d.annotate('',xy=(1e8,1e-2),xytext=(1e8,5e-4),arrowprops=dict(color='k',arrowstyle='->'))
-    ax1d.annotate('',xy=(1e8,1e-6),xytext=(1e8,2e-5),arrowprops=dict(color='k',arrowstyle='->'))
-    ax1d.text(x=1.2e8,y=1e-3,s='opt. thin',ha='left',va='bottom',fontsize=7)
-    ax1d.text(x=1.2e8,y=1e-5,s='opt. thick',ha='left',va='top',fontsize=7)
+    ax1d.annotate('',xy=(1e8,1e-2),xytext=(1e8,5e-4),arrowprops=dict(color='k',arrowstyle='->',linewidth=0.8,mutation_scale=7))
+    ax1d.annotate('',xy=(1e8,1e-6),xytext=(1e8,2e-5),arrowprops=dict(color='k',arrowstyle='->',linewidth=0.8,mutation_scale=7))
+    ax1d.text(x=1.2e8,y=8e-4,s='optically\n thin',ha='left',va='bottom',fontsize=7)
+    ax1d.text(x=1.2e8,y=1.5e-5,s='optically\n thick',ha='left',va='top',fontsize=7)
     ax1d.text(x=1.5e6,y=1.05,s='streaming limit',ha='left',va='bottom',fontsize=7)
 
     box,trans = (0.65,0.97),fig.transFigure # works for mnras1col
@@ -689,8 +693,8 @@ def Make_profiles_plot(figsize):
 
     # plt.show()
 
-    fig.savefig('paper_plots/profiles.pdf',bbox_inches='tight',format='pdf')
-    print('Saved figure to paper_plots/profiles.pdf')
+    fig.savefig('paper_plots/profiles.'+img,bbox_inches='tight',format=img,dpi=dpi)
+    print('Saved figure to paper_plots/profiles.'+img)
 
 
 def Make_gradients_plot(figsize):
@@ -725,6 +729,12 @@ def Make_gradients_plot(figsize):
             ax.semilogx(x,y,ls='-',color='tab:blue',lw=0.5)
             ax.semilogx(x[isonic],y[isonic],marker='x',color='tab:blue',ms=2)
             ax.semilogx(x[iphot],y[iphot],marker='.',color='tab:blue',ms=3)
+
+        # For arrows
+        if logMdot==17.25:
+            flnTi,flnrhoi,flnvi = flnT,flnrho,flnv
+        elif logMdot==18.5:
+            flnTf,flnrhof,flnvf = flnT,flnrho,flnv
 
     # Envelopes
     Rphotkms = (13,15,20,30,40,50)
@@ -765,10 +775,14 @@ def Make_gradients_plot(figsize):
     ax2.set_ylim([-9.3,-1.7])
     ax3.set_ylim([0,4.5])
 
-    # plt.show()
+    # Arrows
+    ax1.annotate('',xy=(2.2e6,-2),xytext=(1.5e6,-1.65),arrowprops=dict(color='tab:blue',arrowstyle='->',linewidth=0.8,mutation_scale=7))
+    ax2.annotate('',xy=(2.5e6,-6.5),xytext=(1.6e6,-5.8),arrowprops=dict(color='tab:blue',arrowstyle='->',linewidth=0.8,mutation_scale=7))
+    ax3.annotate('',xy=(6e6,2.6),xytext=(2.4e6,2),arrowprops=dict(color='tab:blue',arrowstyle='->',linewidth=0.8,mutation_scale=7))
 
-    fig.savefig('paper_plots/gradients.pdf',bbox_inches='tight',format='pdf')
-    print('Saved figure to paper_plots/gradients.pdf')
+
+    fig.savefig('paper_plots/gradients.'+img,bbox_inches='tight',format=img,dpi=dpi)
+    print('Saved figure to paper_plots/gradients.'+img)
 
 
 def Make_rho_T_plot(figsize):
@@ -794,6 +808,9 @@ def Make_rho_T_plot(figsize):
         ax.loglog(w.rho[isonic],w.T[isonic],color='tab:blue',marker='x',ms=2)
         ax.loglog(w.rho[iphot],w.T[iphot],color='tab:blue',marker='.',ms=3)
 
+        if logMdot==17.25:
+            ax.loglog(w.rho,w.T,color='tab:blue',ls='-',lw=0.5,label=label)
+
     # Envelopes
     Rphotkms = (13,15,20,30,40,50)
     for i,Rphotkm in enumerate(Rphotkms):
@@ -804,6 +821,9 @@ def Make_rho_T_plot(figsize):
 
         ax.loglog(env.rho,env.T,color='tab:red',ls='-',lw=0.5,label=label)
         ax.loglog([env.rho[iphot]],[env.T[iphot]],color='tab:red',marker='.',ms=3)
+
+        if Rphotkm==13:
+            ax.loglog(env.rho,env.T,color='tab:red',ls='-',lw=0.5,label=label)
 
 
     ## Pressure lines
@@ -829,11 +849,19 @@ def Make_rho_T_plot(figsize):
     ax.axvline(rho_rel,color='k',lw=0.7)
 
 
-    ax.text(Rho[np.argmin(np.abs(T1-3e6))]*2,3e6,(r'$P_r=P_g$'),
+    ax.text(Rho[np.argmin(np.abs(T1-3e6))]*2,3e6,(r'$P_R=P_g$'),
         transform=ax.transData,ha='left',va='center',fontsize=8)
 
     ax.text(Rho[np.argmin(np.abs(T2-3e6))]*2,3e6,(r'$P_\mathrm{nd}=P_\mathrm{d}$'),
         transform=ax.transData,ha='left',va='center',fontsize=8)
+
+
+    # Arrows
+    ax.annotate('',xy=(5e1,7.5e8),xytext=(1e0,1.4e8),arrowprops=dict(color='tab:blue',arrowstyle='->',linewidth=0.8,mutation_scale=7))
+    ax.annotate('',xy=(1e-7,1.7e6),xytext=(4e-8,3e6),arrowprops=dict(color='tab:blue',arrowstyle='->',linewidth=0.8,mutation_scale=7))
+    
+    ax.annotate('',xy=(1e-1,1e8),xytext=(1e-2,3.6e7),arrowprops=dict(color='tab:red',arrowstyle='->',linewidth=0.8,mutation_scale=7))
+    ax.annotate('',xy=(1e-7,5.5e6),xytext=(1e-7,1.9e7),arrowprops=dict(color='tab:red',arrowstyle='->',linewidth=0.8,mutation_scale=7))
 
 
     ## set x ticks
@@ -845,8 +873,8 @@ def Make_rho_T_plot(figsize):
 
     # plt.show()
 
-    fig.savefig('paper_plots/rho_T.pdf',bbox_inches='tight',format='pdf')
-    print('Saved figure to paper_plots/rho_T.pdf')
+    fig.savefig('paper_plots/rho_T.'+img,bbox_inches='tight',format=img,dpi=dpi)
+    print('Saved figure to paper_plots/rho_T.'+img)
 
 
 def Make_luminosity_plot(figsize,ion=False):
@@ -874,7 +902,6 @@ def Make_luminosity_plot(figsize,ion=False):
     for i,logMdot in enumerate([17.25,17.5,17.75,18,18.25,18.5]):
 
         w = IO.load_wind(logMdot)
-        if i==0: w0=w # save first wind for arrow
 
         rphot = w.rph
         iphot = list(w.r).index(rphot)
@@ -892,13 +919,14 @@ def Make_luminosity_plot(figsize,ion=False):
             ax.semilogx(x[isonic],y[isonic],marker='x',color='tab:blue',ms=ms[0],markerfacecolor='b')
             ax.semilogx(x[iphot],y[iphot],marker='o',color='tab:blue',ms=ms[1],markerfacecolor='b')
 
+            if logMdot==17.25:
+                ax.semilogx(x,y,ls='-',color='tab:blue',lw=0.3,label=label)
+
     # Envelopes
     Rphotkms = (13,15,20,30,40,50)
     for i,Rphotkm in enumerate(Rphotkms):
 
         env = IO.load_envelope(Rphotkm)
-        if i==0: env0=env # save first env for arrow
-
         iphot = list(env.r).index(env.rph)
         
         label = 'envelopes' if i==0 else None
@@ -912,7 +940,18 @@ def Make_luminosity_plot(figsize,ion=False):
             ax.semilogx(x,y,ls='-',color='tab:red',lw=0.3,label=label)
             ax.semilogx(x[iphot],y[iphot],marker='o',color='tab:red',ms=ms[1],markerfacecolor='r')
 
+            if Rphotkm==13:
+                ax.semilogx(x,y,ls='-',color='tab:red',lw=0.3,label=label)   
 
+
+    # Arrows
+    ax1.annotate('',xy=(2e1,0.997),xytext=(6e-2,0.997),arrowprops=dict(color='tab:blue',arrowstyle='->',linewidth=0.6,mutation_scale=6))
+    ax1.annotate('',xy=(1e-8,1.0069),xytext=(1e-8,1.0007),arrowprops=dict(color='tab:blue',arrowstyle='->',linewidth=0.6,mutation_scale=6))
+    
+    ax1.annotate('',xy=(1.1e-2,0.997),xytext=(5e-4,0.997),arrowprops=dict(color='tab:red',arrowstyle='->',linewidth=0.6,mutation_scale=6))
+    ax1.annotate('',xy=(1e-8,0.9993),xytext=(1e-8,0.9968),arrowprops=dict(color='tab:red',arrowstyle='->',linewidth=0.6,mutation_scale=6))
+
+   
 
     # TICKS and stuff..
      
@@ -946,11 +985,10 @@ def Make_luminosity_plot(figsize,ion=False):
     ax2.xaxis.set_tick_params(width=0.5)
     ax2.yaxis.set_tick_params(width=0.5)
 
-
     # plt.show()
 
-    fig.savefig('paper_plots/luminosity.pdf',bbox_inches='tight',format='pdf')
-    print('Saved figure to paper_plots/luminosity.pdf')
+    fig.savefig('paper_plots/luminosity.'+img,bbox_inches='tight',format=img,dpi=dpi)
+    print('Saved figure to paper_plots/luminosity.'+img)
 
 
 def Make_opticaldepth_plot(figsize):
@@ -1048,8 +1086,8 @@ def Make_opticaldepth_plot(figsize):
 
     # plt.show()
 
-    fig.savefig('paper_plots/optical_depth.pdf',bbox_inches='tight',format='pdf')
-    print('Saved figure to paper_plots/optical_depth.pdf')
+    fig.savefig('paper_plots/optical_depth.'+img,bbox_inches='tight',format=img,dpi=dpi)
+    print('Saved figure to paper_plots/optical_depth.'+img)
 
 
 def Make_triple_plot(figsize):
@@ -1196,8 +1234,8 @@ def Make_triple_plot(figsize):
 
     # plt.show()
 
-    fig.savefig('paper_plots/triple.pdf', format='pdf', bbox_inches='tight')
-    print('Saved figure to paper_plots/triple.pdf')
+    fig.savefig('paper_plots/triple.'+img, format=img,dpi=dpi, bbox_inches='tight')
+    print('Saved figure to paper_plots/triple.'+img)
 
 
 def Make_spot_check_MR_plot(figsize):
@@ -1222,7 +1260,7 @@ def Make_spot_check_MR_plot(figsize):
             # For the plot in the paper, we use the non-exact wind models (with Prad=aT^4/3 everywhere), because
             # they are more filled out across the Mdot range (easier to compute) and are very similar anyway.
 
-            # wind_model_name = 'He_M' + str(M) + '_R' + str(R) + '_y8_exact'
+            # wind_model_name = 'He_M' + str(M) + '_R' + str(R) + '_y8_exact/'
             wind_model_name = 'He_M' + str(M) + '_R' + str(R) + '_y8/'
 
             env_model_name  = 'He_M' + str(M) + '_R' + str(R) + '_y8/'
@@ -1296,8 +1334,8 @@ def Make_spot_check_MR_plot(figsize):
 
     # plt.show()
 
-    fig.savefig('paper_plots/spot_check_MR.pdf', format='pdf', bbox_inches='tight')
-    print('Saved figure to paper_plots/spot_check_MR.pdf')
+    fig.savefig('paper_plots/spot_check_MR.'+img, format=img,dpi=dpi, bbox_inches='tight')
+    print('Saved figure to paper_plots/spot_check_MR.'+img)
 
 
 
@@ -1310,22 +1348,24 @@ if __name__ == '__main__':
     twocol = set_size('mnras2col')
 
 
-    ## wind plots
-    Make_lineshift_plot(twocol)
-    Make_wind_paramspace_plot(twocol)
-    Make_base_Enuc_plot(twocol)
-    Make_Mdot_prescription_plot(twocol)
+    # # wind plots
+    # Make_lineshift_plot(twocol)
+    # Make_wind_paramspace_plot(twocol)
+    # Make_base_Enuc_plot(twocol)
+    # Make_Mdot_prescription_plot(twocol)
 
-    ## envelope plots
-    Make_touchdown_error_plot(twocol)
-    Make_env_paramspace_plot(twocol)
-    Make_env_energy_plot(twocol)
+    # # envelope plots
+    # Make_touchdown_error_plot(twocol)
+    # Make_env_paramspace_plot(twocol)
+    # Make_env_energy_plot(twocol)
 
-    ## compare plots
-    Make_profiles_plot(onecol)
-    Make_gradients_plot(twocol)
-    Make_rho_T_plot(twocol)
-    Make_luminosity_plot(twocol)
-    Make_opticaldepth_plot(twocol)
-    Make_triple_plot(twocol)
-    Make_spot_check_MR_plot(onecol)
+    # # compare plots
+    # Make_profiles_plot(onecol)
+    # Make_gradients_plot(twocol)
+    # Make_rho_T_plot(twocol)
+    # Make_luminosity_plot(twocol)
+    # Make_opticaldepth_plot(twocol)
+    # Make_triple_plot(twocol)
+    # Make_spot_check_MR_plot(onecol)
+
+

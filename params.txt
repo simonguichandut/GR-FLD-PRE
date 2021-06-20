@@ -1,5 +1,5 @@
 M	1.4	[Msun]
 R	12	[km]
 yb      1e8	[g/cm2]	
-comp	He	(H, He, Ni, or solar)
+comp	He	(H, He, He, or solar)
 Prad    exact	(simple or exact)
