@@ -76,7 +76,7 @@ def set_size(width, fraction=1):
     fig_dim = (fig_width_in, fig_height_in)
 
     return fig_dim
-    
+
 
 
 # Main model
@@ -101,7 +101,7 @@ dpi = 300 if img == 'png' else None
 # ------------------------------------------------ WIND PLOTS ------------------------------------------------
 
 def Make_lineshift_plot(figsize):
-    
+
     fig,(ax1,ax2) = plt.subplots(2,1,figsize=(figsize[0],1.8*figsize[1]))
     fig.subplots_adjust(hspace=0.4)
 
@@ -131,7 +131,7 @@ def Make_lineshift_plot(figsize):
     logMdots2 = []
 
     for logMdot in logMdots:
-        
+
         logMdots2.append(logMdot)
 
         w = IO.load_wind(logMdot)
@@ -206,7 +206,7 @@ def Make_wind_paramspace_plot(figsize):
                 s,fs = (r'log$\dot{M}$='+str(logMdot)),8
             else:
                 s,fs = str(logMdot),7
-            
+
             # ax.text(Edotvals[i]+0.0005,logrsvals[i],s,fontsize=8,transform=ax.transData,ha='left',va='center')
             ax.text(xpos[j],ypos[j],s,fontsize=fs,transform=ax.transData,ha='left',va='center')
             j+=1
@@ -267,7 +267,7 @@ def Make_base_Enuc_plot(figsize):
     x_minor = FixedLocator([17.5,17.6,17.7,17.8,17.9,18.1,18.2,18.3,18.4,18.6,18.7,18.8,18.8,19.1,19.2,19.3,19.4,19.6,19.7,19.8,19.9])
     ax.xaxis.set_minor_locator(x_minor)
     ax.xaxis.set_minor_formatter(NullFormatter())
-    
+
 
     fig.savefig('paper_plots/wind_base_Enuc.'+img,bbox_inches='tight',format=img,dpi=dpi)
     print('Saved figure to paper_plots/wind_base_Enuc.'+img)
@@ -293,13 +293,13 @@ def Make_Mdot_prescription_plot(figsize):
             enth_inf1.append(2*LEdd/10**logMdot*w.u[-1]/c)
             enth_inf2.append(2*arad*w.T[-1]**4/w.rho[-1])
 
-    
+
     Lbs = np.array(Lbs)
     # PP86 prediction
     Mdots_pred = (Lbs-LEdd)/(6.6726e-8*2e33*1.4/12e5)
 
 
-    # or plot as ratio 
+    # or plot as ratio
     ax.plot(Lbs/LEdd, Mdots_pred/10**np.array(logMdots2), 'k-', label='model values', lw=0.7)
 
     ## plot more correct formula with redshit and enthalpy at infinity
@@ -320,10 +320,10 @@ def Make_Mdot_prescription_plot(figsize):
 def Make_touchdown_error_plot(figsize):
 
     # It's only here that we'll have the very compact envelopes
-    keV = 1.602177e-9 
+    keV = 1.602177e-9
 
     fig,(ax1,ax2) = plt.subplots(2,1,figsize=(figsize[0],1.5*figsize[1]),sharex=True)
-    fig.subplots_adjust(hspace=0) 
+    fig.subplots_adjust(hspace=0)
 
     ax2.set_xlabel(r'$r_\mathrm{ph}-R$ (cm)')
     ax1.set_ylabel(r'$L^\infty/L_\mathrm{Edd}$')
@@ -336,14 +336,14 @@ def Make_touchdown_error_plot(figsize):
     for rphotkm in rphots0:
 
         if rphotkm >= 12.005:
-    
+
             env = IO.load_envelope(rphotkm)
 
             if env.Linf/LEdd>=1:
                 break
 
             rphots.append(rphotkm)
-            
+
             Lb = env.Linf*gr.Swz(env.r[0])**(-1)
             Lcrb = gr.Lcrit(env.r[0],env.rho[0],env.T[0],eos)
 
@@ -354,13 +354,13 @@ def Make_touchdown_error_plot(figsize):
             Teffinf.append(env.T[iphot]*gr.Swz(rphotkm*1e5)**(+0.5))
 
     rphots,Teffinf = np.array(rphots), np.array(Teffinf)
-        
+
     ax1.semilogx((rphots-RNS)*1e5, Lratio, 'k-', lw=0.8)
     ax2.semilogx((rphots-RNS)*1e5, kB*Teffinf/keV, 'k-', lw=0.8)
 
     # Pavlov color correction
     def fc_pavlov(x):  # x=Linf/LEdd (might have to change this if I misunderstand Pavlov)
-        return (0.14*np.log(3/(1-x)) + 0.59)**(-4/5) * (3/(1-x))**(2/15) * x**(3/20) 
+        return (0.14*np.log(3/(1-x)) + 0.59)**(-4/5) * (3/(1-x))**(2/15) * x**(3/20)
 
     fc = np.array([fc_pavlov(x) for x in pavlov_f])
     ax2.semilogx((rphots-RNS)*1e5, fc*kB*Teffinf/keV, 'k--', lw=0.8, label=(r'$T_\mathrm{color}$ (Pavlov et al. 1991)'))
@@ -461,7 +461,7 @@ def Make_env_paramspace_plot(figsize):
                 f0.append(eval(line.split()[0]))
                 rhophA.append(10**eval(line.split()[1]))
                 rhophB.append(10**eval(line.split()[2])) # saved as log values in the file
-            
+
         return True,f0,rhophA,rhophB
 
 
@@ -640,7 +640,7 @@ def Make_profiles_plot(figsize):
         if i==0: env0=env # save first env for arrow
 
         iphot = list(env.r).index(env.rph)
-        
+
         label = 'envelopes' if i==0 else None
 
         R = np.array(env.r)
@@ -724,11 +724,25 @@ def Make_gradients_plot(figsize):
         isonic = np.argmin(abs(rvec-rsonic))
         iphot = np.argmin(abs(rvec-rphot))
 
-        x = rvec
-        for y,ax in zip([func.derivative()(np.log(x)) for func in (flnT,flnrho,flnv)] , (ax1,ax2,ax3)):
-            ax.semilogx(x,y,ls='-',color='tab:blue',lw=0.5)
-            ax.semilogx(x[isonic],y[isonic],marker='x',color='tab:blue',ms=2)
-            ax.semilogx(x[iphot],y[iphot],marker='.',color='tab:blue',ms=3)
+        # Discrete derivative
+        x = np.log(rvec)
+        y1,y2,y3 = flnT(x),flnrho(x),flnv(x)
+
+        # dy1_dx = (y1[1:]-y1[:-1])/(x[1:]-x[:-1])
+        # dy2_dx = (y2[1:]-y2[:-1])/(x[1:]-x[:-1])
+        # dy3_dx = (y3[1:]-y3[:-1])/(x[1:]-x[:-1])
+        # x=x[1:]
+
+        dy1_dx = (y1[2:]-y1[:-2])/(x[2:]-x[:-2])
+        dy2_dx = (y2[2:]-y2[:-2])/(x[2:]-x[:-2])
+        dy3_dx = (y3[2:]-y3[:-2])/(x[2:]-x[:-2])
+        x=x[1:-1]
+
+        for dy_dx,ax in zip((dy1_dx,dy2_dx,dy3_dx), (ax1,ax2,ax3)):
+            ax.semilogx(np.exp(x),dy_dx,ls='-',color='tab:blue',lw=0.5)
+            ax.semilogx(np.exp(x)[isonic],dy_dx[isonic],marker='x',color='tab:blue',ms=2)
+            ax.semilogx(np.exp(x)[iphot],dy_dx[iphot],marker='.',color='tab:blue',ms=3)
+
 
         # For arrows
         if logMdot==17.25:
@@ -744,31 +758,31 @@ def Make_gradients_plot(figsize):
         rphot = env.rph
 
         r,T,rho = env.r[env.rho>1e-20],env.T[env.rho>1e-20],env.rho[env.rho>1e-20]
-        
+
         flnT,flnrho = IUS(np.log(r),np.log(T)), IUS(np.log(r),np.log(rho))
-        # rvec = np.logspace(np.log10(r[1]),np.log10(rphot),1000)
-        # rvec = np.logspace(np.log10(r[1]),np.log10(r[-1]),100)
-
-        # kind of weird noise 1 km above surface (for 40 & 50 km models), makes plot ugly. Jump over it?
-        rvec=np.concatenate((np.linspace(r[0],r[0]+0.8e5,10),np.logspace(np.log10(r[0]+1.3e5),np.log10(r[-1]),100)))
-
+        rvec = np.exp(np.linspace(np.log(r[0]), np.log(r[-1]),100))
         iphot = np.argmin(abs(rvec-rphot))
 
-        x2 = rvec
-        y1,y2 = [func.derivative()(np.log(rvec)) for func in (flnT,flnrho)]
+        # Discrete derivative
+        x = np.log(rvec)
+        y1,y2 = flnT(x),flnrho(x)
 
-        # y1 (dlnT/dlnr) is supposed to go to -0.5 but we cut that part when we remove rho<1e-20
-        # Let's remove points above -0.6 because noise appears in between -0.6 and -0.5
-        x1 = rvec
-        if max(y1)>-0.6:
-            icut = np.argwhere(y1>-0.6)[0][0]
-            x1,y1 = x1[:icut],y1[:icut]
+        # dy1_dx = (y1[1:]-y1[:-1])/(x[1:]-x[:-1])
+        # dy2_dx = (y2[1:]-y2[:-1])/(x[1:]-x[:-1])
+        # x=x[1:]
 
-        x1,y1 = np.append(x1,[x1[-1]*1.01,1e8]), np.append(y1,[-0.5,-0.5])
+        dy1_dx = (y1[2:]-y1[:-2])/(x[2:]-x[:-2])
+        dy2_dx = (y2[2:]-y2[:-2])/(x[2:]-x[:-2])
+        x=x[1:-1]
 
-        for x,y,ax in zip((x1,x2),(y1,y2),(ax1,ax2)):
-            ax.semilogx(x,y,ls='-',color='tab:red',lw=0.5)
-            ax.semilogx(x[iphot],y[iphot],marker='.',color='tab:red',ms=3)
+        # dlnT/dlnr is supposed to go to -0.5 but we cut that part when we remove rho<1e-20
+        x2=x # no change for rho
+        x1=np.append(x,[x[-1]*1.001,np.log(1e8)])
+        dy1_dx=np.append(dy1_dx,[-0.5,-0.5])
+
+        for x,dy_dx,ax in zip((x1,x2),(dy1_dx,dy2_dx),(ax1,ax2)):
+            ax.semilogx(np.exp(x),dy_dx,ls='-',color='tab:red',lw=0.5)
+            ax.semilogx(np.exp(x[iphot]),dy_dx[iphot],marker='.',color='tab:red',ms=3)
 
 
     ax1.set_ylim([-4.3,0])
@@ -780,7 +794,6 @@ def Make_gradients_plot(figsize):
     ax2.annotate('',xy=(2.5e6,-6.5),xytext=(1.6e6,-5.8),arrowprops=dict(color='tab:blue',arrowstyle='->',linewidth=0.8,mutation_scale=7))
     ax3.annotate('',xy=(6e6,2.6),xytext=(2.4e6,2),arrowprops=dict(color='tab:blue',arrowstyle='->',linewidth=0.8,mutation_scale=7))
 
-
     fig.savefig('paper_plots/gradients.'+img,bbox_inches='tight',format=img,dpi=dpi)
     print('Saved figure to paper_plots/gradients.'+img)
 
@@ -788,10 +801,10 @@ def Make_gradients_plot(figsize):
 def Make_rho_T_plot(figsize):
 
     fig,ax = plt.subplots(1,1,figsize=figsize)
-        
+
     ax.set_xlabel(r'$\rho$ (g cm$^{-3}$)')
     ax.set_ylabel(r'$T$ (K)')
-    
+
     ax.set_xlim([1e-8,1e6])
     ax.set_ylim([1e6,3e9])
 
@@ -816,7 +829,7 @@ def Make_rho_T_plot(figsize):
     for i,Rphotkm in enumerate(Rphotkms):
         env = IO.load_envelope(Rphotkm)
         iphot = list(env.r).index(env.rph)
-        
+
         label = 'envelopes' if i==0 else None
 
         ax.loglog(env.rho,env.T,color='tab:red',ls='-',lw=0.5,label=label)
@@ -859,7 +872,7 @@ def Make_rho_T_plot(figsize):
     # Arrows
     ax.annotate('',xy=(5e1,7.5e8),xytext=(1e0,1.4e8),arrowprops=dict(color='tab:blue',arrowstyle='->',linewidth=0.8,mutation_scale=7))
     ax.annotate('',xy=(1e-7,1.7e6),xytext=(4e-8,3e6),arrowprops=dict(color='tab:blue',arrowstyle='->',linewidth=0.8,mutation_scale=7))
-    
+
     ax.annotate('',xy=(1e-1,1e8),xytext=(1e-2,3.6e7),arrowprops=dict(color='tab:red',arrowstyle='->',linewidth=0.8,mutation_scale=7))
     ax.annotate('',xy=(1e-7,5.5e6),xytext=(1e-7,1.9e7),arrowprops=dict(color='tab:red',arrowstyle='->',linewidth=0.8,mutation_scale=7))
 
@@ -928,7 +941,7 @@ def Make_luminosity_plot(figsize,ion=False):
 
         env = IO.load_envelope(Rphotkm)
         iphot = list(env.r).index(env.rph)
-        
+
         label = 'envelopes' if i==0 else None
 
         x = env.rho
@@ -941,20 +954,20 @@ def Make_luminosity_plot(figsize,ion=False):
             ax.semilogx(x[iphot],y[iphot],marker='o',color='tab:red',ms=ms[1],markerfacecolor='r')
 
             if Rphotkm==13:
-                ax.semilogx(x,y,ls='-',color='tab:red',lw=0.3,label=label)   
+                ax.semilogx(x,y,ls='-',color='tab:red',lw=0.3,label=label)
 
 
     # Arrows
     ax1.annotate('',xy=(2e1,0.997),xytext=(6e-2,0.997),arrowprops=dict(color='tab:blue',arrowstyle='->',linewidth=0.6,mutation_scale=6))
     ax1.annotate('',xy=(1e-8,1.0069),xytext=(1e-8,1.0007),arrowprops=dict(color='tab:blue',arrowstyle='->',linewidth=0.6,mutation_scale=6))
-    
+
     ax1.annotate('',xy=(1.1e-2,0.997),xytext=(5e-4,0.997),arrowprops=dict(color='tab:red',arrowstyle='->',linewidth=0.6,mutation_scale=6))
     ax1.annotate('',xy=(1e-8,0.9993),xytext=(1e-8,0.9968),arrowprops=dict(color='tab:red',arrowstyle='->',linewidth=0.6,mutation_scale=6))
 
-   
+
 
     # TICKS and stuff..
-     
+
     # set x ticks
     x_major = LogLocator(base = 10.0, numticks = 6)
     ax1.xaxis.set_major_locator(x_major)
@@ -970,7 +983,7 @@ def Make_luminosity_plot(figsize,ion=False):
     y_minor = FixedLocator([0.9975,1.0025,1.0075])
     ax1.yaxis.set_minor_locator(y_minor)
     ax1.yaxis.set_minor_formatter(NullFormatter())
-    
+
     y_major = FixedLocator([0.9998,1])
     ax2.yaxis.set_major_locator(y_major)
     y_minor = FixedLocator([0.9999])
@@ -994,10 +1007,10 @@ def Make_luminosity_plot(figsize,ion=False):
 def Make_opticaldepth_plot(figsize):
 
     fig,ax = plt.subplots(1,1,figsize=figsize)
-        
+
     ax.set_xlabel(r'r (cm)')
     ax.set_ylabel(r'$\tau,\tau^*$')
-    
+
     ax.set_ylim([1e-1,100])
     ax.set_xlim([1e6,1e9])
 
@@ -1007,7 +1020,7 @@ def Make_opticaldepth_plot(figsize):
     def tau_true(r,rho,T, npts, min_rho=1e-20):
 
         # We want tau(r), i.e. we want a value at many radii point. We can do this by splitting the interval
-        # in npts, and quad-integrate a spline interpolation between every point, and then yield the 
+        # in npts, and quad-integrate a spline interpolation between every point, and then yield the
         # cumulative sums
 
         # Cut any points that have rho=min_rho, because presumably min_rho was just assigned, is not physical
@@ -1075,7 +1088,7 @@ def Make_opticaldepth_plot(figsize):
     class MyObjectHandler(HandlerBase):
         def create_artists(self, legend, orig_handle,
                         x0, y0, width, height, fontsize, trans):
-                
+
                 l1 = plt.Line2D([x0,width], [0.6*height,0.6*height], linewidth=0.8, color=orig_handle[0], ls=orig_handle[2])
                 l2 = plt.Line2D([x0,width], [0.2*height,0.2*height], linewidth=0.8, color=orig_handle[1], ls=orig_handle[2])
 
@@ -1122,7 +1135,7 @@ def Make_triple_plot(figsize):
         t2,_ = quad(func_inverse_u,b,c,epsrel=1e-5)
         return t1+t2
 
-    
+
     ## Load grid data
     logMdots = IO.get_wind_list()
     Lbinf_wind,Tb_wind,rph_wind,rs_wind = [[] for i in range(4)]
@@ -1163,8 +1176,8 @@ def Make_triple_plot(figsize):
 
     ax1.plot(Linf_env/LEdd, Tb_env/1e9, color='tab:red',ls='-', lw=0.8, label='envelopes')
     ax1.plot(Lbinf_wind/LEdd, Tb_wind/1e9, color='tab:blue',ls='-', lw=0.8, label='winds')
-    
-    box = (0.8,1.15) 
+
+    box = (0.8,1.15)
     ax1.legend(frameon=False, ncol=2, bbox_to_anchor=box, bbox_transform=ax1.transAxes)
 
 
@@ -1175,11 +1188,11 @@ def Make_triple_plot(figsize):
     x = Lbinf_wind/LEdd
     for i in range(len(logMdots)):
         if logMdots[i] == fulltext_pos:
-                ax1.text(x[i]+0.05, Tb_wind[i]/1e9-0.02, (r'log $\dot{M}$ = '+str(logMdots[i])), 
+                ax1.text(x[i]+0.05, Tb_wind[i]/1e9-0.02, (r'log $\dot{M}$ = '+str(logMdots[i])),
                         fontweight='bold', color='k',fontsize=7)
                 ax1.plot(x[i], Tb_wind[i]/1e9, 'ko', mfc='w', mec='k', ms=3, mew=.5)
         elif logMdots[i] in write_number:
-                ax1.text(x[i]+0.05, Tb_wind[i]/1e9-0.02, str(logMdots[i]), 
+                ax1.text(x[i]+0.05, Tb_wind[i]/1e9-0.02, str(logMdots[i]),
                         fontweight='bold', color='k',fontsize=7)
                 ax1.plot(x[i], Tb_wind[i]/1e9, 'ko', mfc='w', mec='k', ms=3, mew=.5)
 
@@ -1190,7 +1203,7 @@ def Make_triple_plot(figsize):
     x_minor = FixedLocator([1.25,1.75,2.25,2.75])
     ax.xaxis.set_minor_locator(x_minor)
     ax.xaxis.set_minor_formatter(NullFormatter())
-    
+
 
     ax2.semilogy(Lbinf_wind/LEdd, rph_wind/1e5, color='tab:blue',ls='-',lw=0.8)#,label=r'$r_\mathrm{ph}$')
     ax2.semilogy(Linf_env/LEdd, rph_env, color='tab:red',ls='-',lw=0.8)
@@ -1210,7 +1223,7 @@ def Make_triple_plot(figsize):
     class MyObjectHandler(HandlerBase):
         def create_artists(self, legend, orig_handle,
                         x0, y0, width, height, fontsize, trans):
-                
+
                 if not set(orig_handle[1]).isdisjoint(('b','k','g','r')):  # could add more colors to this
 
                         l1 = plt.Line2D([x0,width], [0.7*height,0.7*height], linewidth=0.8, color=orig_handle[0])
@@ -1218,12 +1231,12 @@ def Make_triple_plot(figsize):
 
                         return l1, l2
 
-                else: 
+                else:
                         l1 = plt.Line2D([x0,y0+width], [0.5*height,0.5*height], linewidth=0.8,
                                         color=orig_handle[0], linestyle=orig_handle[1])
 
                         l2 = plt.Line2D([x0,width], [0.5*height,0.5*height], alpha=0)  #transparent
-                                        
+
                         return l1,l2
 
     ax3.legend([('tab:blue','tab:red'), ('tab:blue','-.'), ('tab:blue',':')], [(r'$\tau_\mathrm{sound}$'),(r'$\tau_\mathrm{sound-flow}$'),(r'$\tau_s$')],
@@ -1304,8 +1317,8 @@ def Make_spot_check_MR_plot(figsize):
                     if filename.endswith('.txt'):
                         Rphotkm.append(eval(filename[:-4].replace('_','.')))
 
-                Rphotkm = [int(x) if str(x)[-1]=='0' else x for x in list(np.sort(Rphotkm))] 
-                
+                Rphotkm = [int(x) if str(x)[-1]=='0' else x for x in list(np.sort(Rphotkm))]
+
                 Rphotkm = [x for x in Rphotkm if x>=12.1] # don't show most compact models
 
                 Linf = []
@@ -1315,7 +1328,7 @@ def Make_spot_check_MR_plot(figsize):
                         if len(s[s.find('.')+1:]) == 1: # this counts the number of char after '.' (#decimals)
                             if s[-1]=='0':
                                 r = round(eval(s))
-                    
+
                     filename = path + str(r).replace('.','_') + '.txt'
                     env = IO.load_envelope(r,specific_file=filename)
                     Linf.append(env.Linf)
@@ -1361,7 +1374,7 @@ if __name__ == '__main__':
 
     # # compare plots
     # Make_profiles_plot(onecol)
-    # Make_gradients_plot(twocol)
+    Make_gradients_plot(twocol)
     # Make_rho_T_plot(twocol)
     # Make_luminosity_plot(twocol)
     # Make_opticaldepth_plot(twocol)

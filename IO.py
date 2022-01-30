@@ -14,30 +14,30 @@ def load_params(as_dict=True):
         yb = float(f.readline().split()[1])
         comp = f.readline().split()[1]
         Prad = f.readline().split()[1]
-        
+
     if as_dict is True:
         return {'M':M,'R':R,'yb':yb,'comp':comp,'Prad':Prad}
     else:
         return M,R,yb,comp,Prad
 
 
-def get_name(include_Prad = True):  
-    ''' We give various files and directories the same name corresponding 
+def get_name(include_Prad = True):
+    ''' We give various files and directories the same name corresponding
         to the setup given in the parameter file '''
     params = load_params()
-    name = '_'.join([ 
-        params['comp'], ('M%.1f'%params['M']), ('R%2d'%params['R']) , 
+    name = '_'.join([
+        params['comp'], ('M%.1f'%params['M']), ('R%2d'%params['R']) ,
         ('y%1d'%np.log10(params['yb'])) ])
 
     if params['Prad'] == 'exact' and include_Prad:
         name += '_exact'
-        
+
     return name
 
 
 def get_wind_list():
     ''' Available winds for current model, listed by their logMdot (g/s) values '''
-    
+
     path = 'winds/models/' + get_name() + '/'
 
     logMdots = []
@@ -64,13 +64,13 @@ def get_envelope_list():
     return sorted_list_clean
 
 
-# We used named tuple objects to store solutions. They allow us to access arrays by their variable name, 
+# We used named tuple objects to store solutions. They allow us to access arrays by their variable name,
 # while also being able to tuple unpack to get everything in the usual python way.
 from collections import namedtuple
-Wind = namedtuple('Wind', ['rs','rph','Edot','r','T','rho','u','Lstar'])  
+Wind = namedtuple('Wind', ['rs','rph','Edot','r','T','rho','u','Lstar'])
 Env = namedtuple('Env', ['rph','Linf','r','T','rho'])
 
-    
+
 #------------------------------------ Winds ------------------------------------
 
 def save_wind_root(logMdot,root,decimals=8):
@@ -96,7 +96,7 @@ def save_wind_root(logMdot,root,decimals=8):
                 logMdot,root[0],root[1]))
 
 
-def load_wind_roots(logMdot=None,specific_file=None):
+def load_wind_roots(logMdot=None, specific_file=None, return_filename=False):
 
     if specific_file != None:
         filename = specific_file
@@ -118,18 +118,25 @@ def load_wind_roots(logMdot=None,specific_file=None):
                 roots.append([float(stuff[1]), float(stuff[2])])
 
         if logMdot is None:
-            return logMdots,roots
+            if return_filename:
+                return logMdots,roots,filename
+            else:
+                return logMdots,roots
+
         else:
-            return roots[logMdots.index(logMdot)]
+            if return_filename:
+                return roots[logMdots.index(logMdot)],filename
+            else:
+                return roots[logMdots.index(logMdot)]
 
 
 def clean_wind_rootfile(warning=1):
 
-    # Find duplicates, and remove all but the latest root 
+    # Find duplicates, and remove all but the latest root
     # (assuming the last one is the correct one)
     # Sort from lowest to biggest
 
-    logMdots,roots = load_wind_roots() 
+    logMdots,roots = load_wind_roots()
     new_logMdots = np.sort(np.unique(logMdots))
 
     if list(new_logMdots) != list(logMdots):
@@ -142,7 +149,7 @@ def clean_wind_rootfile(warning=1):
         new_roots = []
         for i in v:
             new_roots.append(roots[i])
-            
+
         if warning:
             o = eval(input('Roots file will be overwritten. Proceed? (0 or 1) '))
         else:
@@ -151,9 +158,9 @@ def clean_wind_rootfile(warning=1):
             filename = get_name()
             path = 'winds/roots/roots_' + filename + '.txt'
             os.remove(path)
-            for x,y in zip(new_logMdots,new_roots): 
-                decimals = max((len(str(y[0])),len(str(y[1])))) - 2  
-                if decimals<8: decimals=8 #if by chance both 8th decimals are zero 
+            for x,y in zip(new_logMdots,new_roots):
+                decimals = max((len(str(y[0])),len(str(y[1])))) - 2
+                if decimals<8: decimals=8 #if by chance both 8th decimals are zero
                 save_wind_root(x,y,decimals=decimals)
 
 
@@ -188,7 +195,7 @@ def write_wind(logMdot,wind):
     print('\nWind data saved at: ',filename)
 
 
-def load_wind(logMdot, specific_file=None):
+def load_wind(logMdot, specific_file=None, return_filename=False):
 
     '''outputs arrays from save file and rs '''
 
@@ -205,11 +212,11 @@ def load_wind(logMdot, specific_file=None):
 
             if i==0:
                 Edot = float(line.split()[-1])
-            
+
             else:
                 append_vars(line, varz)
 
-                if line.split()[-1] == 'point': 
+                if line.split()[-1] == 'point':
                     rs = eval(line.split()[0])
                 elif line.split()[-1] == 'radius':
                     rph = eval(line.split()[0])
@@ -217,7 +224,10 @@ def load_wind(logMdot, specific_file=None):
     r,rho,T,u,Lstar = np.array(varz)
 
     # Return as Wind named tuple object
-    return Wind(rs, rph, Edot, r, T, rho, u, Lstar)
+    if return_filename:
+        return Wind(rs, rph, Edot, r, T, rho, u, Lstar), filename
+    else:
+        return Wind(rs, rph, Edot, r, T, rho, u, Lstar)
 
 
 def save_EdotTsrel(logMdot, Edotvals, TsvalsA, TsvalsB, decimals=8):
@@ -249,7 +259,7 @@ def save_EdotTsrel(logMdot, Edotvals, TsvalsA, TsvalsB, decimals=8):
                     edot, tsa, tsb))
 
 
-def load_EdotTsrel(logMdot, specific_file=None):
+def load_EdotTsrel(logMdot, specific_file=None, return_filename=False):
 
     if specific_file is not None:
         filepath = specific_file
@@ -269,14 +279,17 @@ def load_EdotTsrel(logMdot, specific_file=None):
             Edotvals.append(eval(line.split()[0]))
             TsvalsA.append(eval(line.split()[1]))
             TsvalsB.append(eval(line.split()[2]))
-    
-    return True,Edotvals,TsvalsA,TsvalsB
+
+    if return_filename:
+        return True,Edotvals,TsvalsA,TsvalsB,filename
+    else:
+        return True,Edotvals,TsvalsA,TsvalsB
     # note that Edotvals is (Edot-Mdotc^2)/LEdd, Tsvals is logTs
 
 
 def clean_EdotTsrelfile(logMdot,warning=1):
 
-    # Find duplicates, and remove all but the latest root 
+    # Find duplicates, and remove all but the latest root
     # (assuming the last one is the correct one)
     # Sort from lowest to biggest
 
@@ -314,7 +327,7 @@ def clean_EdotTsrelfile(logMdot,warning=1):
                 decimals = max((len(str(e)),len(str(tsa)),len(str(tsb)))) - 2
                 # print(decimals)
                 save_EdotTsrel(logMdot,[e],[tsa],[tsb],decimals=decimals)
-            
+
 
 
 #---------------------------------- Envelopes ----------------------------------
@@ -339,16 +352,18 @@ def write_envelope(Rphotkm,env):
 
         for i in range(len(env.r)):
             f.write('%0.8e \t %0.6e \t %0.6e \t'%
-                (env.r[i], env.rho[i], env.T[i]))    
+                (env.r[i], env.rho[i], env.T[i]))
 
             f.write('\n')
-    
+
     print('\nEnvelope data saved at: ',filename)
 
 
-def load_envelope(Rphotkm, specific_file=None):
+def load_envelope(Rphotkm, rho_min=1e-20, specific_file=None, return_filename=False):
 
-    # output is Envelope namedtuple object       
+    # output is Envelope namedtuple object
+    # if rho_min is not None, will exclude all points after the first point with 
+    # minimum density
 
     # Sometimes because of numpy coversions 13 gets converted to 13.0 for example.
     # We have to remove these zeros else the file isn't found
@@ -370,16 +385,23 @@ def load_envelope(Rphotkm, specific_file=None):
 
     r, rho, T = [[] for i in range (3)]
     with open(filename,'r') as f:
-        for i,line in enumerate(f): 
-            if i==0: 
+        for i,line in enumerate(f):
+            if i==0:
                 Linf = float(line.split()[-1])
             else:
                 append_vars(line,[r, rho, T])
 
+    if rho_min is not None:
+        imax = rho.index(rho_min)
+        r,rho,T = r[:imax], rho[:imax], T[:imax]
+
     r,rho,T = np.array((r,rho,T))
 
     # return as Env named tuple object
-    return Env(Rphotkm*1e5,Linf,r,T,rho)
+    if return_filename:
+        return Env(Rphotkm*1e5,Linf,r,T,rho), filename
+    else:
+        return Env(Rphotkm*1e5,Linf,r,T,rho)
 
 
 def save_rhophf0rel(Rphotkm, f0vals, rhophvalsA, rhophvalsB):
@@ -405,7 +427,7 @@ def save_rhophf0rel(Rphotkm, f0vals, rhophvalsA, rhophvalsB):
                 f0, np.log10(rhopha), np.log10(rhophb)))
 
 
-def load_rhophf0rel(Rphotkm):
+def load_rhophf0rel(Rphotkm, return_filename=False):
 
     s = str(Rphotkm)
     if s[-2:]=='.0': s=s[:-2]
@@ -415,30 +437,34 @@ def load_rhophf0rel(Rphotkm):
     name = name[:i-1] + name[i+2:]
     path = 'envelopes/roots/' + name
 
-    filepath = 'envelopes/roots/' + name + '/rhophf0rel_' + s + '.txt'
-    if not os.path.exists(filepath):
+    filename = 'envelopes/roots/' + name + '/rhophf0rel_' + s + '.txt'
+    if not os.path.exists(filename):
         return False,
 
     else:
         f0, rhophA, rhophB = [],[],[]
-        with open(filepath,'r') as f:
+        with open(filename,'r') as f:
             next(f)
             for line in f:
                 f0.append(eval(line.split()[0]))
                 rhophA.append(10**eval(line.split()[1]))
                 rhophB.append(10**eval(line.split()[2])) # saved as log values in the file
-         
-        return True,f0,rhophA,rhophB
+
+        if return_filename:
+            return True,f0,rhophA,rhophB,filename
+        else:
+            return True,f0,rhophA,rhophB
 
 
-def clean_rhophf0relfile(Rphotkm,warning=1):
+def clean_rhophf0relfile(Rphotkm, warning=1):
 
-    # Find duplicates, and remove all but the latest root 
+    # Find duplicates, and remove all but the latest root
     # (assuming the last one is the correct one)
     # Sort from lowest to biggest f0
 
     _,f0vals,rhophvalsA,rhophvalsB = load_rhophf0rel(Rphotkm)
-    new_f0vals = np.sort(np.unique(f0vals))[::-1] # largest f0 value first (to work correctly in the initial search in MakeEnvelope)
+    new_f0vals = np.sort(np.unique(f0vals))[::-1]
+    # largest f0 value first (to work correctly in the initial search in MakeEnvelope)
 
     if list(new_f0vals) != list(f0vals):
 
@@ -453,7 +479,7 @@ def clean_rhophf0relfile(Rphotkm,warning=1):
             new_rhophvalsB.append(rhophvalsB[i])
 
         if warning:
-            o = input('EdotTsrel file will be overwritten. Proceed? (0 or 1) ')
+            o = input('rhophrel file will be overwritten. Proceed? (0 or 1) ')
         else:
             o = 1
         if o:
@@ -461,16 +487,16 @@ def clean_rhophf0relfile(Rphotkm,warning=1):
             i = name.find('y')
             name = name[:i-1] + name[i+2:]
 
-            filepath = 'envelopes/roots/'+name+'/rhophf0rel_'+str(Rphotkm)+'.txt'
-            os.remove(filepath)
+            filename = 'envelopes/roots/'+name+'/rhophf0rel_'+str(Rphotkm)+'.txt'
+            os.remove(filename)
 
             save_rhophf0rel(Rphotkm,new_f0vals,new_rhophvalsA,new_rhophvalsB)
-    
+
 
 
 #------------------------------------ Misc ------------------------------------
 
-def append_vars(line,varz): 
+def append_vars(line, varz):
     l=line.split()
     for col,var in enumerate(varz):
         var.append(float(l[col]))
@@ -514,11 +540,11 @@ def change_param(key, new_value, print_update=True):
 
 def make_directories():
     ''' Make directories according to model name '''
-    
+
     path1 = 'envelopes/models/' + get_name(include_Prad=False)
     path2 = 'winds/models/' + get_name()
     for path in (path1,path2):
-        if not os.path.exists(path): 
+        if not os.path.exists(path):
             os.mkdir(path)
 
 
@@ -576,42 +602,3 @@ def export_grid(target = "."):
             # Teff (T(rph))
             f.write('%0.4e\n'%w.T[iphot])
 
-            
-
-
-def load_wind_old(logMdot, specific_file=None):
-
-    ''' Note to self : If wind text files are from old code, use this because the files are formatted different '''
-
-    if specific_file != None:
-        filename = specific_file
-    else:
-        path = 'winds/models/' + get_name() + '/'
-        filename = path + ('%.2f'%logMdot) + '.txt'
-
-    r,T,rho,P,u,cs,phi,L,Lstar,taus,lam = [[] for i in range(11)]
-    varz = [r,T,rho,P,u,cs,phi,L,Lstar,taus,lam]
-    with open(filename, 'r') as f:
-        next(f)
-        for line in f:
-            append_vars(line, varz)
-
-            if line.split()[-1] == 'point': 
-                rs = eval(line.split()[0])
-
-    r,T,rho,P,u,cs,phi,L,Lstar,taus,lam = (np.array(var) for var in varz)
-
-    # Locate photosphere (should be in written down in text file like rs in the future)
-    arad = 7.5657e-15
-    c = 2.99792458e10
-    F = L/(4*np.pi*r**2)
-    x = F/(arad*c*T**4)
-    rph = r[np.argmin(abs(x - 0.25))]
-
-    # Calculate Edot
-    import physics
-    LEdd = 4*np.pi*c*6.6726e-8*2e33*load_params()['M'] / physics.EquationOfState(load_params()['comp']).kappa0
-    Edot = load_wind_roots(logMdot)[0]*LEdd + 10**logMdot*c**2
-
-    # Return as wind tuple object
-    return Wind(rs, rph, Edot, r, T, rho, u, Lstar)

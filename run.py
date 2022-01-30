@@ -26,9 +26,10 @@ def run_envelopes(Rphotkm_list):
             if E.__str__() == 'Call Again':
                 run_envelopes((rph,))
             else:
+                print(E)
                 problems.append(rph)
                 print('PROBLEM WITH Rphot = %.3f km'%rph)
-        
+
     print('\n\n*********************  SUMMARY *********************')
     print('Found solutions for these values : ',success)
     if len(problems)>=1:
@@ -36,7 +37,7 @@ def run_envelopes(Rphotkm_list):
 
 
 
-def run_wind(logMdot_list=IO.load_wind_roots()[0][::-1]):
+def run_wind(logMdot_list):
 
     # Roots
     logMdot_get_root = [logMdot for logMdot in logMdot_list if logMdot not in IO.load_wind_roots()[0]]

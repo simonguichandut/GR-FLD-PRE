@@ -1,9 +1,12 @@
 *__pycache__*
 *.DS_Store*
+*.swp
 
 # scripts
 temp.py
 energy.py
+load_wind_old.py
+fit.py
 
 # models
 # *Ni_M*
@@ -11,8 +14,10 @@ energy.py
 # other files
 grid*
 energies*
+energy*
 
 #paper_plots.py
 paper_plots/
 new_plots.py
+plot_neglog.py
 new_plots/

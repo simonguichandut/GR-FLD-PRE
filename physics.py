@@ -1,4 +1,4 @@
-## Physics for this problem : equation of state (EOS)
+## Physics for this problem : equation of state (EOS), general relativity (GR), flux-limited diffusion (FLD)
 
 from numpy import sqrt,pi,ndarray
 
@@ -8,7 +8,7 @@ arad = 7.5657e-15
 c = 2.99792458e10
 mp = 1.67e-24
 
-# some functions have a **kwargs argument which is there so that dummy arguments can be 
+# some functions have a **kwargs argument which is there so that dummy arguments can be
 # put in the function call without adding errors. In one EOS, Beta could have 2 args, and in the
 # other it could have 4 args. With kwargs we can always call it with 4 args and the last 2 arguments
 # might just be dummy arguments. In that case these last two arguments must be called with key=arg (kwarg)
@@ -25,7 +25,7 @@ class EquationOfState:
 
         # X,Y,Z : H, He, metals fraction (X+Y+Z=1)
         # Zno : atomic number
-    
+
         # Homogeneous
         if self.comp in ('He','H','Ni'):
 
@@ -76,7 +76,7 @@ class EquationOfState:
             return 3.68e22 * (1-self.Z)*(1+self.X)*rho*T**(-7/2)
 
     def kes(self,T):
-        return self.kappa0/(1.0+(T/4.5e8)**0.86) 
+        return self.kappa0/(1.0+(T/4.5e8)**0.86)
 
     # Electron scattering with degeneracy corrections (not in paper)
     # def kes(self,rho,T):
@@ -87,28 +87,28 @@ class EquationOfState:
         # return self.kes(rho,T) + self.kff(rho,T)
 
     # Ideal gas sound speed c_s^2
-    def cs2(self,T): 
+    def cs2(self,T):
         return kB*T/(self.mu*mp)
 
     # Radiation pressure
-    def rad_pressure(self, T, lam, R): 
+    def rad_pressure(self, T, lam, R):
         # lambda and R are the flux-limited diffusion parameters (Levermore & Pomraning)
         return (lam + (lam*R)**2)*arad*T**4
-    
+
 
     # P and E for ideal gas + radiation
-    def pressure(self, rho, T, lam, R):  
+    def pressure(self, rho, T, lam, R):
         return rho*self.cs2(T) + self.rad_pressure(T,lam,R)
 
-    def internal_energy(self, rho, T):  
-        return 1.5*self.cs2(T)*rho + arad*T**4 
+    def internal_energy(self, rho, T):
+        return 1.5*self.cs2(T)*rho + arad*T**4
 
     # Rest energy + enthalpy
-    def H(self, rho, T, lam, R): 
+    def H(self, rho, T, lam, R):
         return c**2 + (self.internal_energy(rho, T) + self.pressure(rho, T, lam, R))/rho
 
     # Pressure ratio
-    def Beta(self, rho, T, lam, R):  # pressure ratio 
+    def Beta(self, rho, T, lam, R):  # pressure ratio
         Pg = rho*self.cs2(T)
         Pr = self.rad_pressure(T,lam,R)
         return Pg/(Pg+Pr)
@@ -163,7 +163,7 @@ class FluxLimitedDiffusion():
 
         x = self.x(Lstar,r,T,v)
 
-        if isinstance(r, (list,tuple,ndarray)): 
+        if isinstance(r, (list,tuple,ndarray)):
             if len(x[x>1+1e-5])>0:
                 raise Exception("Causality warning F>cE at %d locations"%len(x[x>1]))
         else:
@@ -180,20 +180,20 @@ class GradientParameters():
 
     def __init__(self,M,eos,GR,FLD):
 
-        self.eos = eos        
+        self.eos = eos
         self.GM = 6.6726e-8*2e33*M
         self.LEdd = 4*pi*c*self.GM / self.eos.kappa0
 
         self.GR = GR
         self.FLD = FLD
 
-    def A(self, T): 
+    def A(self, T):
         return 1 + 1.5*self.eos.cs2(T)/c**2
 
     def B(self, T):
         return self.eos.cs2(T)
 
-    def C(self, Lstar, T, r, rho, v):  
+    def C(self, Lstar, T, r, rho, v):
 
         lam,R = self.FLD.Lambda(Lstar,r,T,v)
         L = self.GR.Lcomoving(Lstar,r,v)
@@ -203,10 +203,21 @@ class GradientParameters():
                 self.GM/r * (1 + b/(12*lam*(1-b)))
 
 
-    def Tstar(self, Lstar, T, r, rho, v): 
+    def Tstar(self, Lstar, T, r, rho, v):
 
         lam,_ = self.FLD.Lambda(Lstar,r,T,v)
         L = self.GR.Lcomoving(Lstar,r,v)
 
         return 1/(self.GR.Y(r,v)*lam) * L/self.LEdd * self.eos.kappa(rho,T)/self.eos.kappa0 \
                  * self.GM/(4*r) * rho/(arad*T**4)
+
+def get_physics():
+    # returns all the classes given the current params
+    import IO
+    params = IO.load_params()
+    eos = EquationOfState(params['comp'])
+    gr = GeneralRelativity(params['M'])
+    fld = FluxLimitedDiffusion(gr)
+    gp = GradientParameters(params['M'],eos,gr,fld)
+    print('returning gr,fld,gp')
+    return gr,fld,gp
