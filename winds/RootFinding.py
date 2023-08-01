@@ -524,7 +524,7 @@ def driver(logmdots):
                 problems.append(logMdot)
                 print('\n',e)
                 print('\nPROBLEM WITH LOGMDOT = ',logMdot,'\nTrying again with verbose and checking EdotTs rel...\n\n')
-                try : RootFinder(logMDOT,checkrel=True,Verbose=True)
+                try : RootFinder(logMdot,checkrel=True,Verbose=True)
                 except: pass
 
 

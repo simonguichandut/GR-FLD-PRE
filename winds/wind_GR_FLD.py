@@ -51,7 +51,7 @@ def solve_energy(r,v,T):
     if params['Prad'] == 'simple':
         # If Prad=aT^4 everywhere, the Edot equation is straightforward to solve for Lstar
         rho = Mdot/(4*np.pi*r**2*gr.Y(r, v)*v)
-        return Edot - Mdot*gr.Y(r,v)*eos.H(rho,T,lam=1/3,R=0)
+        return Edot - Mdot*gr.Y(r,v)*eos.H(rho,T,lam=1/3,R=0) # (Mdot*c**2 term is included; H=c^2+enthalpy)
 
 
     elif params['Prad'] == 'exact':
